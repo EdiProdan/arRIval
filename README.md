@@ -29,6 +29,12 @@ Developer workspace for exploring and ingesting Rijeka AUTOTROLEJ transit data.
 4. Fetch one live bus snapshot:
 	- `go run ./cmd/apiclient`
 
+5. Sync static datasets into `data/`:
+	- `go run ./cmd/staticsync`
+
+6. Load static data and print summary counts:
+	- `go run ./cmd/staticloader`
+
 Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
 
 ## Optional: notebooks
@@ -41,7 +47,10 @@ Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`,
 
 - `cmd/apiclient` - login + snapshot fetch CLI
 - `cmd/roundtrip` - Kafka produce/consume smoke test
+- `cmd/staticsync` - one-shot static OpenData downloader into `data/`
+- `cmd/staticloader` - static dataset loader + summary counts
 - `internal/autotrolej` - AUTOTROLEJ API client package
+- `internal/staticdata` - static JSON structs, loader, and lookup maps
 - `docs` - architecture/context, schema, implementation notes
 - `eda` - notebooks and raw cache used for analysis
 - `data` - workspace for downstream data artifacts

@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jupyter Notebook — generated with runcell</title>
+    <meta name="description" content="Exported with runcell — convert .ipynb notebooks to HTML or PDF anytime at runcell.dev." />
+    <meta name="generator" content="runcell" />
+    <style>
+        :root {
+            --jp-code-font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+            --jp-content-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            --jp-cell-prompt-width: 64px;
+            --jp-input-prompt-color: #307fc1;
+            --jp-output-prompt-color: #bf5b3d;
+            --jp-cell-input-bg: #f7f7f7;
+            --jp-layout-color0: #ffffff;
+            --jp-layout-color1: #f7f7f7;
+            --jp-border-color1: #e0e0e0;
+            --jp-content-font-color0: #000000;
+            --jp-content-font-color1: #333333;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--jp-content-font-family);
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--jp-content-font-color0);
+            background-color: var(--jp-layout-color0);
+            margin: 0;
+            padding: 0;
+        }
+
+        .notebook-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Cell structure */
+        .cell {
+            display: flex;
+            flex-direction: row;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .cell-prompt {
+            min-width: var(--jp-cell-prompt-width);
+            width: var(--jp-cell-prompt-width);
+            font-family: var(--jp-code-font-family);
+            font-size: 12px;
+            padding: 10px 8px 10px 0;
+            text-align: right;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .cell-content {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        /* Input prompt styling - Jupyter blue */
+        .input-prompt {
+            color: var(--jp-input-prompt-color);
+            font-weight: bold;
+        }
+
+        /* Output prompt styling - Jupyter red/orange */
+        .output-prompt {
+            color: var(--jp-output-prompt-color);
+            font-weight: bold;
+        }
+
+        /* Code cell input area */
+        .input-area {
+            background-color: var(--jp-cell-input-bg);
+            border: 1px solid var(--jp-border-color1);
+            border-radius: 2px;
+            padding: 8px 12px;
+            overflow-x: auto;
+        }
+
+        .input-area pre {
+            margin: 0;
+            font-family: var(--jp-code-font-family);
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Output area */
+        .output-area {
+            margin-top: 0;
+        }
+
+        .output-wrapper {
+            display: flex;
+            flex-direction: row;
+            margin-top: 4px;
+        }
+
+        .output-content {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 0;
+        }
+
+        .output-content pre {
+            margin: 0;
+            font-family: var(--jp-code-font-family);
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Stream output (stdout/stderr) */
+        .output-stream {
+            font-family: var(--jp-code-font-family);
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .output-stderr {
+            background-color: #fdd;
+            padding: 8px 12px;
+            border-radius: 2px;
+        }
+
+        /* Execute result / display data */
+        .output-result {
+            padding: 4px 0;
+        }
+
+        .output-result pre {
+            margin: 0;
+            font-family: var(--jp-code-font-family);
+            font-size: 13px;
+        }
+
+        /* Image output */
+        .output-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* HTML output (DataFrames, etc.) */
+        .output-html {
+            overflow-x: auto;
+        }
+
+        .output-html table {
+            border-collapse: collapse;
+            font-size: 13px;
+            font-family: var(--jp-content-font-family);
+        }
+
+        .output-html table th,
+        .output-html table td {
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            text-align: left;
+        }
+
+        .output-html table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .output-html table tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        /* Error output */
+        .output-error {
+            background-color: #fff0f0;
+            padding: 8px 12px;
+            border-radius: 2px;
+            font-family: var(--jp-code-font-family);
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+
+        /* Markdown cell styling */
+        .markdown-cell {
+            padding: 10px 0;
+        }
+
+        .markdown-cell h1 {
+            font-size: 2em;
+            font-weight: 600;
+            margin: 0.67em 0;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--jp-border-color1);
+        }
+
+        .markdown-cell h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            margin: 0.83em 0;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--jp-border-color1);
+        }
+
+        .markdown-cell h3 {
+            font-size: 1.25em;
+            font-weight: 600;
+            margin: 1em 0;
+        }
+
+        .markdown-cell h4 {
+            font-size: 1em;
+            font-weight: 600;
+            margin: 1.33em 0;
+        }
+
+        .markdown-cell h5 {
+            font-size: 0.875em;
+            font-weight: 600;
+            margin: 1.67em 0;
+        }
+
+        .markdown-cell h6 {
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 2.33em 0;
+            color: #6a737d;
+        }
+
+        .markdown-cell p {
+            margin: 0 0 16px 0;
+            line-height: 1.6;
+        }
+
+        .markdown-cell code {
+            font-family: var(--jp-code-font-family);
+            font-size: 85%;
+            background-color: rgba(27, 31, 35, 0.05);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+
+        .markdown-cell pre {
+            background-color: var(--jp-cell-input-bg);
+            border: 1px solid var(--jp-border-color1);
+            border-radius: 3px;
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 85%;
+            line-height: 1.45;
+        }
+
+        .markdown-cell pre code {
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+            font-size: 100%;
+        }
+
+        .markdown-cell blockquote {
+            margin: 0 0 16px 0;
+            padding: 0 1em;
+            color: #6a737d;
+            border-left: 4px solid #dfe2e5;
+        }
+
+        .markdown-cell ul,
+        .markdown-cell ol {
+            margin: 0 0 16px 0;
+            padding-left: 2em;
+        }
+
+        .markdown-cell li {
+            margin: 0.25em 0;
+        }
+
+        .markdown-cell a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+
+        .markdown-cell a:hover {
+            text-decoration: underline;
+        }
+
+        .markdown-cell hr {
+            border: 0;
+            border-top: 1px solid var(--jp-border-color1);
+            margin: 24px 0;
+        }
+
+        .markdown-cell img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .markdown-cell table {
+            border-collapse: collapse;
+            margin: 0 0 16px 0;
+        }
+
+        .markdown-cell table th,
+        .markdown-cell table td {
+            border: 1px solid #dfe2e5;
+            padding: 6px 13px;
+        }
+
+        .markdown-cell table th {
+            font-weight: 600;
+            background-color: #f6f8fa;
+        }
+
+        .markdown-cell table tr:nth-child(2n) {
+            background-color: #f6f8fa;
+        }
+
+        /* Raw cell styling */
+        .raw-cell {
+            background-color: var(--jp-layout-color1);
+            border: 1px solid var(--jp-border-color1);
+            border-radius: 2px;
+            padding: 8px 12px;
+            font-family: var(--jp-code-font-family);
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+
+        /* Empty prompt placeholder */
+        .prompt-empty {
+            color: transparent;
+        }
+
+        .export-footer {
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid var(--jp-border-color1);
+            color: #555;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .export-footer a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+
+        .export-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="notebook-container">
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h1>AUTOTROLEJ Live Data EDA (Minimal)</h1><br><br>This notebook does one live snapshot to quickly understand realtime API data.<br><br>Scope:<br>1. Configure runtime and credentials from environment variables<br>2. Login and fetch one <code>/api/open/v1/voznired/autobusi</code> snapshot<br>3. Profile shape, nulls, duplicates, and coordinate ranges<br>4. Render a quick geographic view<br>5. Print short findings</div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>1) Environment Setup and Imports</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [1]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, Optional, List, Tuple
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
+
+import pandas as pd
+
+print(f"Python: {sys.version.split()[0]}")
+print(f"pandas: {pd.__version__}")</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Python: 3.14.3
+pandas: 3.0.0
+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>2) Configuration and Runtime Constants</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [2]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>PROJECT_ROOT = Path.cwd().resolve().parent if Path.cwd().name == "eda" else Path.cwd().resolve()
+ENV_FILE = PROJECT_ROOT / ".env"
+
+if ENV_FILE.exists():
+    for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+API_BASE_URL = os.getenv("ARRIVAL_API_BASE_URL", "").strip()
+LOGIN_PATH = "/api/open/v1/token/login"
+AUTOBUSI_PATH = "/api/open/v1/voznired/autobusi"
+TIMEOUT_SECONDS = 30
+
+ENV_USERNAME = "ARRIVAL_API_USERNAME"
+ENV_PASSWORD = "ARRIVAL_API_PASSWORD"
+
+LIVE_RAW_DIR = PROJECT_ROOT / "eda" / "data_raw" / "live"
+LIVE_RAW_DIR.mkdir(parents=True, exist_ok=True)
+SAVE_LIVE_RAW_SNAPSHOT = True
+
+snapshot_time_utc = datetime.now(timezone.utc)
+
+print(f"Loaded .env file: {ENV_FILE.exists()}")
+print(f"API_BASE_URL set: {bool(API_BASE_URL)}")
+print(f"Username env set: {bool(os.getenv(ENV_USERNAME))}")
+print(f"Password env set: {bool(os.getenv(ENV_PASSWORD))}")
+print(f"LIVE_RAW_DIR: {LIVE_RAW_DIR}")
+print(f"SAVE_LIVE_RAW_SNAPSHOT: {SAVE_LIVE_RAW_SNAPSHOT}")
+print(f"Snapshot UTC: {snapshot_time_utc.isoformat()}")</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Loaded .env file: True
+API_BASE_URL set: True
+Username env set: True
+Password env set: True
+LIVE_RAW_DIR: /Users/ediprodan/Documents/Projects/arRIval/eda/data_raw/live
+SAVE_LIVE_RAW_SNAPSHOT: True
+Snapshot UTC: 2026-02-14T15:50:03.966762+00:00
+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>3) API Helpers (Login + GET)</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [3]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>def api_get_json(url: str, headers: Optional[Dict[str, str]] = None, timeout: int = TIMEOUT_SECONDS):
+    request = Request(url, headers=headers or {}, method="GET")
+    with urlopen(request, timeout=timeout) as response:
+        raw_text = response.read().decode("utf-8")
+        return json.loads(raw_text)
+
+
+def login_get_token(base_url: str, username: str, password: str) -&gt; str:
+    login_url = urljoin(base_url, LOGIN_PATH)
+    payload = api_get_json(
+        login_url,
+        headers={
+            "Username": username,
+            "Password": password,
+            "Accept": "application/json",
+            "User-Agent": "arRIval-live-eda",
+        },
+    )
+    if isinstance(payload, str) and payload.strip():
+        return payload.strip()
+    raise ValueError(f"Unexpected login response type: {type(payload)}")
+
+
+def unwrap_wrapper(payload: dict) -&gt; Tuple[Optional[str], Optional[bool], List[dict]]:
+    msg = payload.get("msg") if isinstance(payload, dict) else None
+    err = payload.get("err") if isinstance(payload, dict) else None
+    res = payload.get("res") if isinstance(payload, dict) else None
+    if res is None:
+        return msg, err, []
+    if not isinstance(res, list):
+        raise ValueError(f"Expected wrapper 'res' list, got {type(res)}")
+    return msg, err, res</pre></div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>4) Fetch One Live Snapshot (<code>/autobusi</code>)</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [4]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>if not API_BASE_URL:
+    raise ValueError("Set ARRIVAL_API_BASE_URL before running.")
+
+username = os.getenv(ENV_USERNAME, "").strip()
+password = os.getenv(ENV_PASSWORD, "").strip()
+if not username or not password:
+    raise ValueError("Set ARRIVAL_API_USERNAME and ARRIVAL_API_PASSWORD before running.")
+
+token = login_get_token(API_BASE_URL, username, password)
+masked_token = f"{token[:6]}...{token[-4:]}" if len(token) &gt;= 12 else "(short token)"
+print(f"Token acquired: {masked_token}")
+
+live_url = urljoin(API_BASE_URL, AUTOBUSI_PATH)
+raw_payload = api_get_json(
+    live_url,
+    headers={
+        "token": token,
+        "Accept": "application/json",
+        "User-Agent": "arRIval-live-eda",
+    },
+)
+
+if SAVE_LIVE_RAW_SNAPSHOT:
+    snapshot_file = LIVE_RAW_DIR / f"autobusi_{snapshot_time_utc.strftime('%Y%m%dT%H%M%SZ')}.json"
+    with snapshot_file.open("w", encoding="utf-8") as f:
+        json.dump(raw_payload, f, ensure_ascii=False)
+    print(f"Saved raw snapshot: {snapshot_file.name}")
+
+msg, err, records = unwrap_wrapper(raw_payload)
+autobusi_df = pd.json_normalize(records)
+
+print(f"Wrapper err: {err}")
+print(f"Wrapper msg: {msg}")
+print(f"Live rows: {len(autobusi_df)}")
+
+display(autobusi_df.head(10))</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Token acquired: n+bi5r...xw==
+Saved raw snapshot: autobusi_20260214T155003Z.json
+Wrapper err: False
+Wrapper msg: ok
+Live rows: 43
+</div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>gbr</th>
+      <th>lon</th>
+      <th>lat</th>
+      <th>voznjaId</th>
+      <th>voznjaBusId</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>838</td>
+      <td>14.275823</td>
+      <td>45.293137</td>
+      <td>1386940.0</td>
+      <td>2124287</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>784</td>
+      <td>14.302432</td>
+      <td>45.332847</td>
+      <td>1386924.0</td>
+      <td>2124314</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>830</td>
+      <td>14.447945</td>
+      <td>45.324783</td>
+      <td>1385745.0</td>
+      <td>2127881</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>787</td>
+      <td>14.440935</td>
+      <td>45.342292</td>
+      <td>1385979.0</td>
+      <td>2127646</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>826</td>
+      <td>0.000000</td>
+      <td>0.000000</td>
+      <td>NaN</td>
+      <td>2064950</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>778</td>
+      <td>14.386997</td>
+      <td>45.369395</td>
+      <td>1386813.0</td>
+      <td>2124436</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>799</td>
+      <td>14.465000</td>
+      <td>45.322082</td>
+      <td>1385678.0</td>
+      <td>2127946</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>840</td>
+      <td>14.448649</td>
+      <td>45.329262</td>
+      <td>NaN</td>
+      <td>2126569</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>664</td>
+      <td>14.479384</td>
+      <td>45.323518</td>
+      <td>1385927.0</td>
+      <td>2127679</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>790</td>
+      <td>14.397205</td>
+      <td>45.342735</td>
+      <td>1385870.0</td>
+      <td>2127733</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>5) Minimal Profiling</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [5]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>if autobusi_df.empty:
+    profile_df = pd.DataFrame()
+    print("No live records in this snapshot.")
+else:
+    profile_rows = []
+    total_rows = len(autobusi_df)
+
+    for col in autobusi_df.columns:
+        null_count = int(autobusi_df[col].isna().sum())
+        profile_rows.append(
+            {
+                "column": col,
+                "dtype": str(autobusi_df[col].dtype),
+                "null_count": null_count,
+                "null_pct": round((null_count / total_rows) * 100, 2),
+                "n_unique": int(autobusi_df[col].nunique(dropna=True)),
+            }
+        )
+
+    profile_df = pd.DataFrame(profile_rows).sort_values("null_pct", ascending=False)
+
+    duplicate_rows = int(autobusi_df.duplicated().sum())
+    basic_stats = {
+        "rows": total_rows,
+        "columns": int(autobusi_df.shape[1]),
+        "duplicate_rows": duplicate_rows,
+        "duplicate_pct": round((duplicate_rows / total_rows) * 100, 2),
+        "unique_gbr": int(autobusi_df["gbr"].nunique(dropna=True)) if "gbr" in autobusi_df.columns else None,
+        "lat_min": float(autobusi_df["lat"].min()) if "lat" in autobusi_df.columns and autobusi_df["lat"].notna().any() else None,
+        "lat_max": float(autobusi_df["lat"].max()) if "lat" in autobusi_df.columns and autobusi_df["lat"].notna().any() else None,
+        "lon_min": float(autobusi_df["lon"].min()) if "lon" in autobusi_df.columns and autobusi_df["lon"].notna().any() else None,
+        "lon_max": float(autobusi_df["lon"].max()) if "lon" in autobusi_df.columns and autobusi_df["lon"].notna().any() else None,
+    }
+
+    print("Basic stats")
+    display(pd.DataFrame([basic_stats]))
+
+    print("\nColumn profile")
+    display(profile_df)</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Basic stats
+</div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>rows</th>
+      <th>columns</th>
+      <th>duplicate_rows</th>
+      <th>duplicate_pct</th>
+      <th>unique_gbr</th>
+      <th>lat_min</th>
+      <th>lat_max</th>
+      <th>lon_min</th>
+      <th>lon_max</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>43</td>
+      <td>5</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>43</td>
+      <td>0.0</td>
+      <td>45.388747</td>
+      <td>0.0</td>
+      <td>14.598708</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">
+Column profile
+</div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>column</th>
+      <th>dtype</th>
+      <th>null_count</th>
+      <th>null_pct</th>
+      <th>n_unique</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>3</th>
+      <td>voznjaId</td>
+      <td>float64</td>
+      <td>10</td>
+      <td>23.26</td>
+      <td>33</td>
+    </tr>
+    <tr>
+      <th>0</th>
+      <td>gbr</td>
+      <td>int64</td>
+      <td>0</td>
+      <td>0.00</td>
+      <td>43</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>lon</td>
+      <td>float64</td>
+      <td>0</td>
+      <td>0.00</td>
+      <td>42</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>lat</td>
+      <td>float64</td>
+      <td>0</td>
+      <td>0.00</td>
+      <td>42</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>voznjaBusId</td>
+      <td>int64</td>
+      <td>0</td>
+      <td>0.00</td>
+      <td>43</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>6) Quick Geographic View</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [6]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>if autobusi_df.empty or not {"lat", "lon"}.issubset(autobusi_df.columns):
+    print("Map skipped: missing rows or lat/lon columns.")
+else:
+    map_df = autobusi_df.dropna(subset=["lat", "lon"]).copy()
+    map_df = map_df[(map_df["lat"] != 0) | (map_df["lon"] != 0)]
+
+    if map_df.empty:
+        print("Map skipped: all coordinates are missing/zero.")
+    else:
+        center_lat = float(map_df["lat"].median())
+        center_lon = float(map_df["lon"].median())
+
+        # Minimal enrichment: live voznjaBusId -&gt; static PolazakId (dnevni only)
+        map_df["voznjaBusId_int"] = pd.to_numeric(map_df.get("voznjaBusId"), errors="coerce")
+        static_dir = PROJECT_ROOT / "eda" / "data_raw"
+        dnevni_path = static_dir / "voznired_dnevni.json"
+
+        if dnevni_path.exists():
+            dnevni_raw = json.loads(dnevni_path.read_text(encoding="utf-8"))
+            dnevni_df = pd.json_normalize(dnevni_raw)
+            required_cols = {"PolazakId", "BrojLinije", "NazivVarijanteLinije", "Smjer"}
+
+            if required_cols.issubset(dnevni_df.columns):
+                dnevni_df = dnevni_df.copy()
+                dnevni_df["PolazakId_int"] = pd.to_numeric(dnevni_df["PolazakId"], errors="coerce")
+                lookup = (
+                    dnevni_df.dropna(subset=["PolazakId_int"])
+                    .sort_values("RedniBrojStanice")
+                    .drop_duplicates("PolazakId_int")
+                    [["PolazakId_int", "BrojLinije", "NazivVarijanteLinije", "Smjer"]]
+                )
+
+                map_df = map_df.merge(
+                    lookup,
+                    left_on="voznjaBusId_int",
+                    right_on="PolazakId_int",
+                    how="left",
+                )
+                matched_rows = int(map_df["BrojLinije"].notna().sum())
+                match_pct = (matched_rows / len(map_df) * 100) if len(map_df) else 0
+                print(f"Route enrichment source: voznired_dnevni (matched {matched_rows}/{len(map_df)} rows, {match_pct:.1f}%)")
+            else:
+                map_df["BrojLinije"] = None
+                map_df["NazivVarijanteLinije"] = None
+                map_df["Smjer"] = None
+                print("Route enrichment unavailable: dnevni file missing required columns.")
+        else:
+            map_df["BrojLinije"] = None
+            map_df["NazivVarijanteLinije"] = None
+            map_df["Smjer"] = None
+            print("Route enrichment unavailable: voznired_dnevni.json not found.")
+
+        map_df["hover_title"] = map_df.apply(
+            lambda r: f"Linija {r['BrojLinije']} | Bus {int(r['gbr'])}" if pd.notna(r.get("BrojLinije")) else f"Bus {int(r['gbr'])}",
+            axis=1,
+        )
+
+        try:
+            import plotly.express as px
+
+            fig = px.scatter_map(
+                map_df,
+                lat="lat",
+                lon="lon",
+                hover_name="hover_title",
+                hover_data={
+                    "NazivVarijanteLinije": True,
+                    "Smjer": True,
+                    "voznjaId": True,
+                    "voznjaBusId": True,
+                    "lat": False,
+                    "lon": False,
+                },
+                zoom=12,
+                center={"lat": center_lat, "lon": center_lon},
+                title="Live bus positions (enriched with line + route)",
+                height=600,
+            )
+            fig.update_layout(map_style="carto-positron", margin={"l": 0, "r": 0, "t": 40, "b": 0})
+            fig.show()
+        except Exception as plotly_error:
+            print(f"Plotly map skipped: {plotly_error}")
+            try:
+                import matplotlib.pyplot as plt
+
+                plt.figure(figsize=(7, 6))
+                plt.scatter(map_df["lon"], map_df["lat"], s=20)
+                plt.title("Live bus positions (enriched with line + route)")
+                plt.xlabel("Longitude")
+                plt.ylabel("Latitude")
+                plt.grid(alpha=0.2)
+                plt.tight_layout()
+                plt.show()
+            except Exception as mpl_error:
+                print(f"Matplotlib fallback skipped: {mpl_error}")</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Route enrichment source: voznired_dnevni (matched 33/41 rows, 80.5%)
+</div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>7) Minimal Validation and Findings</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [7]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>if err is False:
+    assert isinstance(records, list), "Expected wrapper res to be a list when err=False."
+
+if not autobusi_df.empty and {"lat", "lon"}.issubset(autobusi_df.columns):
+    coord_df = autobusi_df.dropna(subset=["lat", "lon"])
+    if not coord_df.empty:
+        valid_lat = coord_df["lat"].between(-90, 90).all()
+        valid_lon = coord_df["lon"].between(-180, 180).all()
+        assert valid_lat and valid_lon, "Coordinates out of global bounds."
+
+print("Live EDA snapshot findings\n")
+print(f"- Snapshot time (UTC): {snapshot_time_utc.isoformat()}")
+print(f"- Wrapper err flag: {err}")
+print(f"- Live rows: {len(autobusi_df)}")
+if "gbr" in autobusi_df.columns:
+    print(f"- Unique buses (gbr): {autobusi_df['gbr'].nunique(dropna=True)}")
+if "lat" in autobusi_df.columns and "lon" in autobusi_df.columns and len(autobusi_df) &gt; 0:
+    non_null_coords = autobusi_df[["lat", "lon"]].notna().all(axis=1).mean() * 100
+    print(f"- Rows with both coordinates: {non_null_coords:.2f}%")
+if not autobusi_df.empty:
+    duplicate_rows = int(autobusi_df.duplicated().sum())
+    print(f"- Duplicate rows in snapshot: {duplicate_rows}")
+
+print("\nDone. This is intentionally minimal: one-call live data understanding.")</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Live EDA snapshot findings
+
+- Snapshot time (UTC): 2026-02-14T15:50:03.966762+00:00
+- Wrapper err flag: False
+- Live rows: 43
+- Unique buses (gbr): 43
+- Rows with both coordinates: 100.00%
+- Duplicate rows in snapshot: 0
+
+Done. This is intentionally minimal: one-call live data understanding.
+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cell cell-markdown">
+            <div class="cell-prompt prompt-empty">&nbsp;</div>
+            <div class="cell-content">
+                <div class="markdown-cell"><h2>8) Minimal Data Interpretation</h2></div>
+            </div>
+        </div>
+        <div class="cell cell-code">
+            <div class="cell-prompt input-prompt">In [8]:</div>
+            <div class="cell-content">
+                <div class="input-area"><pre>if autobusi_df.empty:
+    print("Interpretation skipped: no live rows.")
+else:
+    total = len(autobusi_df)
+
+    zero_coord_mask = (
+        autobusi_df["lat"].fillna(0).eq(0) &amp; autobusi_df["lon"].fillna(0).eq(0)
+        if {"lat", "lon"}.issubset(autobusi_df.columns)
+        else pd.Series([False] * total)
+    )
+    zero_coord_rows = int(zero_coord_mask.sum())
+
+    missing_voznja = int(autobusi_df["voznjaId"].isna().sum()) if "voznjaId" in autobusi_df.columns else None
+
+    active_rows = int((~autobusi_df["voznjaId"].isna()).sum()) if "voznjaId" in autobusi_df.columns else None
+    inactive_rows = int(autobusi_df["voznjaId"].isna().sum()) if "voznjaId" in autobusi_df.columns else None
+
+    print("Quick interpretation")
+    print(f"- Total live rows: {total}")
+    print(f"- Zero-coordinate rows (0,0): {zero_coord_rows} ({(zero_coord_rows / total) * 100:.2f}%)")
+
+    if missing_voznja is not None:
+        print(f"- Rows without voznjaId: {missing_voznja} ({(missing_voznja / total) * 100:.2f}%)")
+        print(f"- Rows with active trip ID: {active_rows}")
+        print(f"- Rows likely not in active trip: {inactive_rows}")
+
+    if "map_df" in globals() and isinstance(map_df, pd.DataFrame) and "BrojLinije" in map_df.columns:
+        mapped_rows = int(map_df["BrojLinije"].notna().sum())
+        unmapped_rows = int(len(map_df) - mapped_rows)
+        mapped_pct = (mapped_rows / len(map_df) * 100) if len(map_df) else 0.0
+        print(f"- Route mapping in map view: {mapped_rows}/{len(map_df)} ({mapped_pct:.2f}%), unmapped={unmapped_rows}")
+
+        if mapped_rows &gt; 0:
+            print("- Top 5 active lines in snapshot:")
+            display(map_df.loc[map_df["BrojLinije"].notna(), "BrojLinije"].value_counts().head(5).to_frame("buses"))
+
+    print("\nMinimal takeaways")
+    print("- Treat (0,0) coordinates as invalid/no-position rows.")
+    print("- `voznjaId` nulls likely represent parked/transition/off-schedule buses.")
+    print("- Snapshot shape is stable enough for next minimal step: short polling window.")</pre></div>
+                <div class="output-area">
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">Quick interpretation
+- Total live rows: 43
+- Zero-coordinate rows (0,0): 2 (4.65%)
+- Rows without voznjaId: 10 (23.26%)
+- Rows with active trip ID: 33
+- Rows likely not in active trip: 10
+- Route mapping in map view: 33/41 (80.49%), unmapped=8
+- Top 5 active lines in snapshot:
+</div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>buses</th>
+    </tr>
+    <tr>
+      <th>BrojLinije</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>2</th>
+      <td>4</td>
+    </tr>
+    <tr>
+      <th>32</th>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>26</th>
+      <td>2</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+                        </div>
+                    </div>
+                    <div class="output-wrapper">
+                        <div class="cell-prompt output-prompt"></div>
+                        <div class="output-content">
+                            <div class="output-stream">
+Minimal takeaways
+- Treat (0,0) coordinates as invalid/no-position rows.
+- `voznjaId` nulls likely represent parked/transition/off-schedule buses.
+- Snapshot shape is stable enough for next minimal step: short polling window.
+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer class="export-footer">
+        Exported with <a href="https://www.runcell.dev/tool/ipynb-to-html">runcell</a> — convert notebooks to HTML or PDF anytime at runcell.dev.
+    </footer>
+</body>
+</html>

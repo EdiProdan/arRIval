@@ -109,7 +109,7 @@ Represents one ordered stop on a line variant path from `linije.json`.
 | Field | Type | Nullability | Meaning |
 |---|---|---|---|
 | `Id` | integer | varies | Row identifier |
-| `LinVarId` | string/integer-like | expected non-null | Line-variant key |
+| `LinVarId` | string | expected non-null | Line-variant key |
 | `BrojLinije` | string | nullable | Public route/line number |
 | `NazivVarijanteLinije` | string | nullable | Variant descriptive name |
 | `Smjer` | string | nullable | Direction label |
@@ -130,9 +130,9 @@ Represents one stop-time row in the timetable dataset (`voznired_dnevni.json`).
 | Field | Type | Nullability | Meaning |
 |---|---|---|---|
 | `Id` | integer | varies | Row identifier |
-| `PolazakId` | integer | expected non-null | Departure/trip key in static timetable |
+| `PolazakId` | string | expected non-null | Departure/trip key in static timetable |
 | `StanicaId` | integer | expected non-null | Station foreign key |
-| `LinVarId` | string/integer-like | expected non-null | Line-variant key |
+| `LinVarId` | string | expected non-null | Line-variant key |
 | `Polazak` | string (time-like) | expected non-null | Scheduled departure/arrival time token |
 | `RedniBrojStanice` | integer | expected non-null | Stop order in trip progression |
 | `BrojLinije` | string | nullable | Public line number |

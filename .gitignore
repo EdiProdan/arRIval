@@ -464,3 +464,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.DS_Store
+
+eda/data_raw/live/*.json
