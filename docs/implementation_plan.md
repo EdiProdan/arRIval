@@ -10,6 +10,7 @@ Set up the Go module, directory layout (`cmd/`, `internal/`, `data/`), and a `do
 
 **Deliverable:** `go.mod` exists, `docker-compose up` starts Redpanda, and a test program round-trips a message through a topic.
 
+**Status:** Completed
 ---
 
 ## Step 1: API Client & Authentication
@@ -18,11 +19,12 @@ Write a Go package that handles the Autotrolej API: login, token refresh, and fe
 
 **Deliverable:** Running `go run cmd/apiclient/main.go` prints a JSON array of live bus positions.
 
+**Status:** Completed
 ---
 
 ## Step 2: Static Data Loader
 
-Write a Go package that reads the static JSON files (stations, lines, schedules) into in-memory structs. Pick the right schedule based on day-of-week (dnevni/tjedan/subota/nedjelja). Expose lookup functions: station by ID, line-variant stops, scheduled departures by PolazakId.
+Write a Go package that reads the static JSON files (stations, lines, schedule) into in-memory structs. Use `voznired_dnevni` as the timetable source. Expose lookup functions: station by ID, line-variant stops, scheduled departures by PolazakId.
 
 **Deliverable:** A test program loads all static data and prints summary counts (e.g. "1186 stations, 155 line variants, 20581 departures loaded").
 

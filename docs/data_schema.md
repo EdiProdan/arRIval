@@ -31,9 +31,6 @@ Located in `eda/data_raw/`:
 - `linije.json`
 - `stanice.json`
 - `voznired_dnevni.json`
-- `voznired_tjedan.json`
-- `voznired_subota.json`
-- `voznired_nedjelja.json`
 
 Live snapshots are stored in `eda/data_raw/live/*.json`.
 
@@ -128,7 +125,7 @@ Notes:
 
 ### 4.4 `TimetableStopRow`
 
-Represents one stop-time row in timetable datasets (`voznired_*`).
+Represents one stop-time row in the timetable dataset (`voznired_dnevni.json`).
 
 | Field | Type | Nullability | Meaning |
 |---|---|---|---|
@@ -158,11 +155,11 @@ Notes:
 
 - `StanicaId`:
   - `stanice` <-> `linije`
-  - `stanice` <-> `voznired_*`
+  - `stanice` <-> `voznired_dnevni`
 - `LinVarId`:
-  - `linije` <-> `voznired_*`
+  - `linije` <-> `voznired_dnevni`
 - `PolazakId`:
-  - groups ordered stop rows within `voznired_*`
+  - groups ordered stop rows within `voznired_dnevni`
 
 ## 5.2 Live-to-static enrichment key
 
@@ -279,7 +276,4 @@ At enrichment time:
 - `eda/data_raw/linije.json`
 - `eda/data_raw/stanice.json`
 - `eda/data_raw/voznired_dnevni.json`
-- `eda/data_raw/voznired_tjedan.json`
-- `eda/data_raw/voznired_subota.json`
-- `eda/data_raw/voznired_nedjelja.json`
 - `eda/data_raw/live/*.json`
