@@ -89,3 +89,19 @@ This file documents:
 Optional environment overrides:
 - `ARRIVAL_KAFKA_BROKERS` (default: `localhost:19092`)
 - `ARRIVAL_KAFKA_TOPIC` (default: `bus-positions-raw`)
+
+## Step 1 API client
+
+1. Copy credentials template:
+	- `cp .env.example .env`
+2. Fill in `.env` with live API credentials.
+3. Run API client snapshot fetch:
+	- `go run ./cmd/apiclient`
+
+Expected output:
+- one JSON wrapper object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
+
+Optional environment overrides:
+- `ARRIVAL_API_TIMEOUT` (duration, e.g. `15s`; or seconds as integer)
+- `ARRIVAL_API_TOKEN_TTL` (default: `60m`)
+- `ARRIVAL_API_REFRESH_MARGIN` (default: `5m`)
