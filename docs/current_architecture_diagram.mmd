@@ -1,0 +1,62 @@
+graph TB
+    subgraph "Data Sources"
+        API1["AUTOTROLEJ /autobusi<br/>(live positions)"]
+        ODS1["OpenData ATlinije.json"]
+        ODS2["OpenData ATstanice.json"]
+        ODS3["OpenData ATvoznired.json"]
+    end
+
+    subgraph "Ingestion Layer"
+        Ingester[Ingester Service<br/>Go - polls every 30s]
+        StaticSync[StaticSync CLI<br/>Go - one-shot static downloader]
+        APIClient[APIClient CLI<br/>Go - one-shot live snapshot]
+    end
+
+    subgraph "Message Broker"
+        T1["Redpanda Topic:<br/>bus-positions-raw"]
+    end
+
+    subgraph "Processing Layer"
+        Processor[Processor Service<br/>Go - stream to Bronze Parquet]
+    end
+
+    subgraph "Storage"
+        Bronze["🥉 Bronze<br/>data/bronze/YYYY-MM-DD/<br/>positions.parquet"]
+        StaticFiles["Static JSON Files<br/>data/linije.json<br/>data/stanice.json<br/>data/voznired_dnevni.json"]
+    end
+
+    subgraph "Validation and Loader CLIs"
+        Roundtrip[Roundtrip CLI<br/>Go - produce/consume smoke test]
+        StaticLoader[StaticLoader CLI<br/>Go - loads static data + counts]
+    end
+
+    %% Data flow
+    API1 -->|HTTP poll| Ingester
+    API1 -->|one-shot fetch| APIClient
+
+    ODS1 -->|download| StaticSync
+    ODS2 -->|download| StaticSync
+    ODS3 -->|download| StaticSync
+
+    StaticSync -->|write JSON| StaticFiles
+    StaticFiles -->|load and index| StaticLoader
+
+    Ingester -->|publish raw JSON| T1
+    T1 -->|consume| Processor
+    Processor -->|write| Bronze
+
+    Roundtrip -->|produce test message| T1
+    T1 -->|consume test message| Roundtrip
+
+    %% Styling
+    classDef storage fill:#e1f5ff,stroke:#0366d6
+    classDef service fill:#fff5e1,stroke:#d97706
+    classDef broker fill:#f0e6ff,stroke:#8b5cf6
+    classDef utility fill:#f5f5f5,stroke:#6b7280
+    classDef source fill:#eefaf3,stroke:#059669
+
+    class Bronze,StaticFiles storage
+    class Ingester,Processor service
+    class T1 broker
+    class StaticSync,APIClient,Roundtrip,StaticLoader utility
+    class API1,ODS1,ODS2,ODS3 source
