@@ -28,6 +28,7 @@ Write a Go package that reads the static JSON files (stations, lines, schedule) 
 
 **Deliverable:** A test program loads all static data and prints summary counts (e.g. "1186 stations, 155 line variants, 20581 departures loaded").
 
+**Status:** Completed
 ---
 
 ## Step 3: Ingester Service
@@ -36,6 +37,7 @@ Build `cmd/ingester` — a long-running service that polls `/autobusi` every 30 
 
 **Deliverable:** Start Redpanda + ingester, watch `bus-positions-raw` topic fill up with messages using `rpk topic consume`.
 
+**Status**: Completed
 ---
 
 ## Step 4: Processor Service — Bronze Layer
@@ -44,6 +46,7 @@ Build the first half of `cmd/processor` — consume from `bus-positions-raw` and
 
 **Deliverable:** After running ingester + processor for a few minutes, `data/bronze/` contains a Parquet file you can read back with a test script or Python.
 
+**Status**: Completed
 ---
 
 ## Step 5: Processor Service — Silver Layer (Delay Calculation)

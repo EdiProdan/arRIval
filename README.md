@@ -35,6 +35,17 @@ Developer workspace for exploring and ingesting Rijeka AUTOTROLEJ transit data.
 6. Load static data and print summary counts:
 	- `go run ./cmd/staticloader`
 
+7. Start live ingestion loop (poll `/autobusi` every 30s and publish to Kafka):
+	- `go run ./cmd/ingester`
+
+8. Consume live messages from topic `bus-positions-raw`:
+	- `rpk topic consume bus-positions-raw -X brokers=localhost:19092`
+	- (optional) `export RPK_BROKERS=localhost:19092` to avoid repeating `-X brokers=...`
+
+9. Start Bronze processor (consume raw topic and write daily Parquet):
+	- `go run ./cmd/processor`
+	- output path: `data/bronze/YYYY-MM-DD/positions.parquet` (UTC date)
+
 Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
 
 ## Optional: notebooks
@@ -46,6 +57,7 @@ Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`,
 ## Key folders
 
 - `cmd/apiclient` - login + snapshot fetch CLI
+- `cmd/ingester` - 30s poller that publishes live `/autobusi` payloads to Kafka
 - `cmd/roundtrip` - Kafka produce/consume smoke test
 - `cmd/staticsync` - one-shot static OpenData downloader into `data/`
 - `cmd/staticloader` - static dataset loader + summary counts

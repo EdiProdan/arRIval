@@ -468,3 +468,5 @@ __marimo__/
 .DS_Store
 
 eda/data_raw/live/*.json
+
+data/
