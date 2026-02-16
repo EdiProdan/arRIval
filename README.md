@@ -42,9 +42,11 @@ Developer workspace for exploring and ingesting Rijeka AUTOTROLEJ transit data.
 	- `rpk topic consume bus-positions-raw -X brokers=localhost:19092`
 	- (optional) `export RPK_BROKERS=localhost:19092` to avoid repeating `-X brokers=...`
 
-9. Start Bronze processor (consume raw topic and write daily Parquet):
+9. Start processor (consume raw topic, write Bronze+Silver Parquet, publish delays):
 	- `go run ./cmd/processor`
-	- output path: `data/bronze/YYYY-MM-DD/positions.parquet` (UTC date)
+	- Bronze output: `data/bronze/YYYY-MM-DD/positions.parquet` (UTC date)
+	- Silver output: `data/silver/YYYY-MM-DD/delays.parquet` (UTC date)
+	- Delay topic: `bus-delays`
 
 Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
 

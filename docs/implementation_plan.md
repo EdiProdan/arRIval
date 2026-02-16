@@ -60,6 +60,8 @@ Extend the processor with the enrichment logic:
 
 **Deliverable:** Silver Parquet files contain rows with fields like `bus_id, station_id, line, scheduled_time, actual_time, delay_seconds`. Consume `bus-delays` topic to verify.
 
+**Status**: Completed
+
 ---
 
 ## Step 6: Aggregator Service — Gold Layer

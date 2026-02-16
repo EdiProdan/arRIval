@@ -99,17 +99,24 @@ Behavior:
 ### 5.4 `cmd/processor`
 
 Purpose:
-- Consume raw live topic and write Bronze Parquet dataset.
+- Consume raw live topic, write Bronze and Silver Parquet datasets, and publish delay events.
 
 Behavior:
 - Loads `.env` if present
 - Creates Kafka consumer group client
 - Consumes topic (default `bus-positions-raw`)
+- Creates Kafka producer client for delay event publishing
+- Loads static reference data from local data directory for matching/enrichment
 - Unmarshals messages into `autotrolej.AutobusiResponse`
 - Emits one Parquet row per bus item from `res`
 - Partitions output by UTC date under Bronze directory
+- Performs nearest-station matching and schedule-window checks for delay enrichment
+- Writes matched delay rows into date-partitioned Silver Parquet files
+- Publishes matched delay events to output topic (default `bus-delays`)
 - Default output path pattern:
   - `data/bronze/YYYY-MM-DD/positions.parquet`
+- Silver output path pattern:
+  - `data/silver/YYYY-MM-DD/delays.parquet`
 - Uses Snappy compression
 - Marks records for commit after successful processing path
 - On malformed JSON payload: logs error and still allows commit path for that record
@@ -238,6 +245,14 @@ Additional optional variables used by `cmd/apiclient` duration parsing:
 - `ARRIVAL_API_TOKEN_TTL`
 - `ARRIVAL_API_REFRESH_MARGIN`
 
+Additional processor variables:
+- `ARRIVAL_KAFKA_DELAY_TOPIC`
+  - Default: `bus-delays`
+- `ARRIVAL_SILVER_DIR`
+  - Default: `data/silver`
+- `ARRIVAL_STATIC_DIR`
+  - Default: `data`
+
 ### 7.2 Dotenv Loading Pattern
 
 - `cmd/apiclient`, `cmd/ingester`, and `cmd/processor` load `.env` from repository root when file exists.
@@ -253,6 +268,8 @@ Flow:
 3. `cmd/processor` consumes topic in consumer group `arrival-processor-bronze` (or configured group)
 4. processor expands each message into one row per bus element in `res`
 5. processor writes rows into date-partitioned Bronze Parquet file
+6. processor enriches matched events and writes date-partitioned Silver delay rows
+7. processor publishes delay events to topic `bus-delays` (or configured delay topic)
 
 ### 8.2 Static Reference Data Flow
 
@@ -280,6 +297,9 @@ Flow:
 - Bronze files (default):
   - `data/bronze/YYYY-MM-DD/positions.parquet`
 
+- Silver files (default):
+  - `data/silver/YYYY-MM-DD/delays.parquet`
+
 ### 9.2 Kafka Topic Usage
 
 Current implemented topic usage:
@@ -287,8 +307,8 @@ Current implemented topic usage:
   - Producer: `cmd/ingester`
   - Consumer: `cmd/processor`
   - Also used by `cmd/roundtrip` for smoke testing unless overridden
-
-No additional application topics are currently implemented in code.
+- Delay topic: `bus-delays`
+  - Producer: `cmd/processor`
 
 ## 10. Runtime Execution Order (Operational)
 
