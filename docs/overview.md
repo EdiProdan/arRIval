@@ -11,7 +11,7 @@
 ```
 API Poller → Redpanda → Processor → Parquet (Bronze/Silver/Gold)
                 ↓
-          Prometheus metrics
+          Prometheus metrics → Grafana dashboard
 ```
 
 ### **3 Simple Services**
@@ -35,6 +35,13 @@ API Poller → Redpanda → Processor → Parquet (Bronze/Silver/Gold)
 - **Gold**: Calculate hourly stats per route (avg delay, p95, p99)
 - Write to `data/gold/YYYY-MM-DD/stats.parquet`
 - Metrics: aggregation lag
+
+### **Observability (Minimal Step 8)**
+- Prometheus and Grafana run in Docker Compose
+- Services continue to run on host and expose `/metrics`
+- Grafana auto-loads one provisioned dashboard: `arRIval - Minimal Operations`
+- Panels: live poll health, delay distribution, system lag, and busiest/worst **proxy** panel
+- Note: true per-route “worst/busiest” ranking is not exposed yet via Prometheus labels
 
 ### **Delay Calculation (Keep it Stupid)**
 ```

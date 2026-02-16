@@ -63,6 +63,15 @@ Developer workspace for exploring and ingesting Rijeka AUTOTROLEJ transit data.
 		- open `http://localhost:9090/targets`
 		- expected jobs: `ingester`, `processor`, `aggregator`
 
+12. Step 8 (minimal): add Grafana with provisioned datasource + dashboard:
+	- start Grafana (and Prometheus if not already running):
+		- `docker compose up -d prometheus grafana`
+	- open Grafana:
+		- `http://localhost:3000` (default login `admin` / `admin`)
+	- verify dashboard:
+		- open dashboard `arRIval - Minimal Operations`
+		- panels use current Step 7 metrics for poll health, delay distribution, throughput/worst-delay proxies, and processing lag
+
 Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
 
 ## Optional: notebooks
@@ -81,6 +90,7 @@ Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`,
 - `cmd/staticsync` - one-shot static OpenData downloader into `data/`
 - `cmd/staticloader` - static dataset loader + summary counts
 - `deploy/prometheus` - Prometheus scrape configuration for Step 7 metrics
+- `deploy/grafana` - Grafana provisioning + minimal dashboard for Step 8
 - `internal/autotrolej` - AUTOTROLEJ API client package
 - `internal/metrics` - shared `/metrics` HTTP server helper
 - `internal/staticdata` - static JSON structs, loader, and lookup maps

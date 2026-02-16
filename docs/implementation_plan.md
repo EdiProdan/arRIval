@@ -95,6 +95,8 @@ Add Grafana to Docker Compose with Prometheus as a data source. Build a single d
 
 **Deliverable:** `docker-compose up` gives you a working Grafana dashboard showing bus delay data.
 
+**Status:** Completed 
+
 ---
 
 ## Step 9: Polish & Run End-to-End

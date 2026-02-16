@@ -17,6 +17,7 @@ Primary responsibilities currently implemented:
 - Consume delay topic and materialize Gold Parquet route-hour aggregates
 - Download and load static OpenData reference datasets
 - Provide a Kafka roundtrip connectivity smoke test
+- Expose and visualize service metrics via Prometheus + Grafana (minimal host-run services mode)
 
 ## 3. Runtime Topology
 
@@ -37,6 +38,15 @@ Primary responsibilities currently implemented:
     - `host.docker.internal:9101` (ingester)
     - `host.docker.internal:9102` (processor)
     - `host.docker.internal:9103` (aggregator)
+
+- Grafana, defined in `docker-compose.yml`
+  - Image: `grafana/grafana:11.6.0`
+  - UI endpoint: `localhost:3000`
+  - Provisioning mount: `deploy/grafana/provisioning`
+  - Dashboard mount: `deploy/grafana/dashboards`
+  - Default local credentials: `admin` / `admin`
+  - Provisioned dashboard: `arRIval - Minimal Operations`
+    - Includes live poll health, delay quantiles, system lag, and busiest/worst proxy panel
 
 ### 3.2 External Systems
 
@@ -383,6 +393,7 @@ Typical current sequence:
 6. Run `cmd/processor`
 7. Run `cmd/aggregator`
 8. Start Prometheus via compose and verify targets in UI/API
+9. Start Grafana via compose and verify provisioned dashboard loads
 
 ## 11. Error Handling and Resilience Characteristics
 
@@ -411,6 +422,9 @@ Typical current sequence:
 - `cmd/staticsync/main.go`
 - `cmd/staticloader/main.go`
 - `deploy/prometheus/prometheus.yml`
+- `deploy/grafana/provisioning/datasources/prometheus.yml`
+- `deploy/grafana/provisioning/dashboards/dashboards.yml`
+- `deploy/grafana/dashboards/arrival-minimal.json`
 - `internal/autotrolej/client.go`
 - `internal/metrics/metrics.go`
 - `internal/staticdata/staticdata.go`

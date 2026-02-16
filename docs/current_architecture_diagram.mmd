@@ -34,6 +34,11 @@ graph TB
         StaticLoader[StaticLoader CLI<br/>Go - loads static data + counts]
     end
 
+    subgraph "Observability"
+        Prom[Prometheus<br/>metrics scraping]
+        Graf[Grafana<br/>provisioned dashboard]
+    end
+
     %% Data flow
     API1 -->|HTTP poll| Ingester
     API1 -->|one-shot fetch| APIClient
@@ -53,6 +58,11 @@ graph TB
     T2 -->|consume delay events| Aggregator
     Aggregator -->|write hourly route stats| Gold
 
+    Ingester -.->|expose metrics| Prom
+    Processor -.->|expose metrics| Prom
+    Aggregator -.->|expose metrics| Prom
+    Prom -.->|query| Graf
+
     Roundtrip -->|produce test message| T1
     T1 -->|consume test message| Roundtrip
 
@@ -62,9 +72,11 @@ graph TB
     classDef broker fill:#f0e6ff,stroke:#8b5cf6
     classDef utility fill:#f5f5f5,stroke:#6b7280
     classDef source fill:#eefaf3,stroke:#059669
+    classDef observability fill:#e6ffe6,stroke:#059669
 
     class Bronze,Silver,Gold,StaticFiles storage
     class Ingester,Processor,Aggregator service
     class T1,T2 broker
     class StaticSync,APIClient,Roundtrip,StaticLoader utility
     class API1,ODS1,ODS2,ODS3 source
+    class Prom,Graf observability
