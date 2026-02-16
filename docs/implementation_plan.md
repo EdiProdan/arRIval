@@ -70,6 +70,8 @@ Build `cmd/aggregator` — consume from `bus-delays`, compute hourly stats per r
 
 **Deliverable:** Gold Parquet files contain hourly route-level aggregations you can query.
 
+**Status**: Completed
+
 ---
 
 ## Step 7: Prometheus Metrics

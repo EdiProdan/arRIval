@@ -48,6 +48,10 @@ Developer workspace for exploring and ingesting Rijeka AUTOTROLEJ transit data.
 	- Silver output: `data/silver/YYYY-MM-DD/delays.parquet` (UTC date)
 	- Delay topic: `bus-delays`
 
+10. Start aggregator (consume delay topic, compute hourly route stats, write Gold):
+	- `go run ./cmd/aggregator`
+	- Gold output: `data/gold/YYYY-MM-DD/stats.parquet` (UTC date)
+
 Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
 
 ## Optional: notebooks
@@ -60,6 +64,8 @@ Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`,
 
 - `cmd/apiclient` - login + snapshot fetch CLI
 - `cmd/ingester` - 30s poller that publishes live `/autobusi` payloads to Kafka
+- `cmd/processor` - consume raw topic, write Bronze+Silver Parquet, publish delay events
+- `cmd/aggregator` - consume delay topic and write Gold hourly route-level stats
 - `cmd/roundtrip` - Kafka produce/consume smoke test
 - `cmd/staticsync` - one-shot static OpenData downloader into `data/`
 - `cmd/staticloader` - static dataset loader + summary counts
