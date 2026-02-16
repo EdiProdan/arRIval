@@ -467,6 +467,6 @@ __marimo__/
 
 .DS_Store
 
-eda/data_raw/live/*.json
+eda/data_raw/
 
 data/

@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/EdiProdan/arRIval/internal/autotrolej"
+	"github.com/EdiProdan/arRIval/internal/staticdata"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/parquet"
@@ -23,8 +26,14 @@ import (
 const (
 	defaultBrokers       = "localhost:19092"
 	defaultInputTopic    = "bus-positions-raw"
+	defaultOutputTopic   = "bus-delays"
 	defaultConsumerGroup = "arrival-processor-bronze"
 	defaultBronzeDir     = "data/bronze"
+	defaultSilverDir     = "data/silver"
+	defaultStaticDir     = "data"
+	stationMatchMeters   = 100.0
+	scheduleWindow       = 5 * time.Minute
+	earthRadiusMeters    = 6371000.0
 )
 
 type bronzePositionRow struct {
@@ -50,6 +59,47 @@ type bronzeDailyWriter struct {
 	rowsWritten int64
 }
 
+type silverDelayRow struct {
+	IngestedAt     string  `parquet:"name=ingested_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	IngestedDate   string  `parquet:"name=ingested_date, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	PolazakID      string  `parquet:"name=polazak_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	VoznjaBusID    int64   `parquet:"name=voznja_bus_id, type=INT64"`
+	GBR            *int64  `parquet:"name=gbr, type=INT64, repetitiontype=OPTIONAL"`
+	StationID      int64   `parquet:"name=station_id, type=INT64"`
+	StationName    string  `parquet:"name=station_name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	DistanceM      float64 `parquet:"name=distance_m, type=DOUBLE"`
+	LinVarID       string  `parquet:"name=lin_var_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	BrojLinije     string  `parquet:"name=broj_linije, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	ScheduledTime  string  `parquet:"name=scheduled_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	ActualTime     string  `parquet:"name=actual_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	DelaySeconds   int64   `parquet:"name=delay_seconds, type=INT64"`
+	KafkaTopic     string  `parquet:"name=kafka_topic, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	KafkaPartition int32   `parquet:"name=kafka_partition, type=INT32"`
+	KafkaOffset    int64   `parquet:"name=kafka_offset, type=INT64"`
+}
+
+type silverDailyWriter struct {
+	baseDir     string
+	currentDate string
+	currentPath string
+	pw          *writer.ParquetWriter
+	rowsWritten int64
+}
+
+type delayEvent struct {
+	PolazakID     string  `json:"polazak_id"`
+	VoznjaBusID   int64   `json:"voznja_bus_id"`
+	GBR           *int64  `json:"gbr,omitempty"`
+	StationID     int64   `json:"station_id"`
+	StationName   string  `json:"station_name"`
+	DistanceM     float64 `json:"distance_m"`
+	LinVarID      string  `json:"lin_var_id"`
+	BrojLinije    string  `json:"broj_linije"`
+	ScheduledTime string  `json:"scheduled_time"`
+	ActualTime    string  `json:"actual_time"`
+	DelaySeconds  int64   `json:"delay_seconds"`
+}
+
 func main() {
 	if err := loadDotEnv(".env"); err != nil {
 		log.Fatalf("load .env: %v", err)
@@ -60,8 +110,16 @@ func main() {
 
 	brokers := splitCSV(getenv("ARRIVAL_KAFKA_BROKERS", defaultBrokers))
 	inputTopic := getenv("ARRIVAL_KAFKA_TOPIC", defaultInputTopic)
+	outputTopic := getenv("ARRIVAL_KAFKA_DELAY_TOPIC", defaultOutputTopic)
 	consumerGroup := getenv("ARRIVAL_PROCESSOR_GROUP", defaultConsumerGroup)
 	bronzeDir := getenv("ARRIVAL_BRONZE_DIR", defaultBronzeDir)
+	silverDir := getenv("ARRIVAL_SILVER_DIR", defaultSilverDir)
+	staticDir := getenv("ARRIVAL_STATIC_DIR", defaultStaticDir)
+
+	store, err := staticdata.LoadFromDir(staticDir)
+	if err != nil {
+		log.Fatalf("load static data: %v", err)
+	}
 
 	consumer, err := kgo.NewClient(
 		kgo.SeedBrokers(brokers...),
@@ -73,6 +131,12 @@ func main() {
 	}
 	defer consumer.Close()
 
+	producer, err := kgo.NewClient(kgo.SeedBrokers(brokers...))
+	if err != nil {
+		log.Fatalf("create producer client: %v", err)
+	}
+	defer producer.Close()
+
 	bw := &bronzeDailyWriter{baseDir: bronzeDir}
 	defer func() {
 		if err := bw.Close(); err != nil {
@@ -80,9 +144,17 @@ func main() {
 		}
 	}()
 
-	log.Printf("processor started: input_topic=%s group=%s bronze_dir=%s", inputTopic, consumerGroup, bronzeDir)
+	sw := &silverDailyWriter{baseDir: silverDir}
+	defer func() {
+		if err := sw.Close(); err != nil {
+			log.Printf("close silver writer: %v", err)
+		}
+	}()
+
+	log.Printf("processor started: input_topic=%s output_topic=%s group=%s bronze_dir=%s silver_dir=%s", inputTopic, outputTopic, consumerGroup, bronzeDir, silverDir)
 
 	var messageCount int64
+	var publishedCount int64
 	for {
 		if ctx.Err() != nil {
 			break
@@ -98,13 +170,14 @@ func main() {
 
 		var commitRecords []*kgo.Record
 		fetches.EachRecord(func(rec *kgo.Record) {
-			commit, writeErr := processRecord(bw, rec)
+			commit, published, writeErr := processRecord(ctx, bw, sw, producer, outputTopic, store, rec)
 			if writeErr != nil {
 				log.Printf("status=error stage=process partition=%d offset=%d err=%v", rec.Partition, rec.Offset, writeErr)
 				return
 			}
 
 			messageCount++
+			publishedCount += published
 			if commit {
 				commitRecords = append(commitRecords, rec)
 			}
@@ -115,17 +188,18 @@ func main() {
 		}
 	}
 
-	log.Printf("processor stopped: messages=%d rows=%d", messageCount, bw.rowsWritten)
+	log.Printf("processor stopped: messages=%d bronze_rows=%d silver_rows=%d published=%d", messageCount, bw.rowsWritten, sw.rowsWritten, publishedCount)
 }
 
-func processRecord(bw *bronzeDailyWriter, rec *kgo.Record) (bool, error) {
+func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWriter, producer *kgo.Client, outputTopic string, store *staticdata.Store, rec *kgo.Record) (bool, int64, error) {
 	var payload autotrolej.AutobusiResponse
 	if err := json.Unmarshal(rec.Value, &payload); err != nil {
 		log.Printf("status=error stage=unmarshal partition=%d offset=%d err=%v", rec.Partition, rec.Offset, err)
-		return true, nil
+		return true, 0, nil
 	}
 
 	ingestedAt := time.Now().UTC()
+	var published int64
 	for _, bus := range payload.Res {
 		row := bronzePositionRow{
 			IngestedAt:     ingestedAt.Format(time.RFC3339Nano),
@@ -143,8 +217,31 @@ func processRecord(bw *bronzeDailyWriter, rec *kgo.Record) (bool, error) {
 		}
 
 		if err := bw.Write(row); err != nil {
-			return false, err
+			return false, published, err
 		}
+
+		silverRow, event, ok, reason := buildDelay(ingestedAt, bus, row, store)
+		if !ok {
+			log.Printf("status=skip stage=delay_match reason=%s partition=%d offset=%d voznja_bus_id=%v", reason, rec.Partition, rec.Offset, bus.VoznjaBusID)
+			continue
+		}
+
+		if err := sw.Write(silverRow); err != nil {
+			return false, published, err
+		}
+
+		payloadBytes, err := json.Marshal(event)
+		if err != nil {
+			return false, published, fmt.Errorf("marshal delay event: %w", err)
+		}
+
+		key := fmt.Sprintf("%d:%d:%d", event.VoznjaBusID, rec.Partition, rec.Offset)
+		if err := producer.ProduceSync(ctx, &kgo.Record{Topic: outputTopic, Key: []byte(key), Value: payloadBytes}).FirstErr(); err != nil {
+			return false, published, fmt.Errorf("publish delay event: %w", err)
+		}
+
+		published++
+		log.Printf("status=ok stage=delay_publish topic=%s partition=%d offset=%d station_id=%d delay_seconds=%d", outputTopic, rec.Partition, rec.Offset, event.StationID, event.DelaySeconds)
 	}
 
 	log.Printf(
@@ -155,7 +252,7 @@ func processRecord(bw *bronzeDailyWriter, rec *kgo.Record) (bool, error) {
 		len(payload.Res),
 	)
 
-	return true, nil
+	return true, published, nil
 }
 
 func (bw *bronzeDailyWriter) Write(row bronzePositionRow) error {
@@ -224,6 +321,262 @@ func (bw *bronzeDailyWriter) Close() error {
 	bw.currentDate = ""
 	bw.currentPath = ""
 	return nil
+}
+
+func (sw *silverDailyWriter) Write(row silverDelayRow) error {
+	if err := sw.ensureDate(row.IngestedDate); err != nil {
+		return err
+	}
+
+	if err := sw.pw.Write(row); err != nil {
+		return fmt.Errorf("write silver parquet row: %w", err)
+	}
+
+	sw.rowsWritten++
+	return nil
+}
+
+func (sw *silverDailyWriter) ensureDate(date string) error {
+	if sw.pw != nil && sw.currentDate == date {
+		return nil
+	}
+
+	if err := sw.Close(); err != nil {
+		return err
+	}
+
+	dayDir := filepath.Join(sw.baseDir, date)
+	if err := os.MkdirAll(dayDir, 0o755); err != nil {
+		return fmt.Errorf("create silver day dir %s: %w", dayDir, err)
+	}
+
+	filePath := filepath.Join(dayDir, "delays.parquet")
+	fw, err := local.NewLocalFileWriter(filePath)
+	if err != nil {
+		return fmt.Errorf("open silver parquet file writer %s: %w", filePath, err)
+	}
+
+	pw, err := writer.NewParquetWriter(fw, new(silverDelayRow), 1)
+	if err != nil {
+		_ = fw.Close()
+		return fmt.Errorf("create silver parquet writer %s: %w", filePath, err)
+	}
+	pw.CompressionType = parquet.CompressionCodec_SNAPPY
+
+	sw.currentDate = date
+	sw.currentPath = filePath
+	sw.pw = pw
+
+	log.Printf("status=ok stage=silver_writer_open file=%s", filePath)
+	return nil
+}
+
+func (sw *silverDailyWriter) Close() error {
+	if sw.pw == nil {
+		return nil
+	}
+
+	if err := sw.pw.WriteStop(); err != nil {
+		return fmt.Errorf("close silver parquet writer %s: %w", sw.currentPath, err)
+	}
+
+	log.Printf("status=ok stage=silver_writer_close file=%s", sw.currentPath)
+	sw.pw = nil
+	sw.currentDate = ""
+	sw.currentPath = ""
+	return nil
+}
+
+func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePositionRow, store *staticdata.Store) (silverDelayRow, delayEvent, bool, string) {
+	if bus.Lon == nil || bus.Lat == nil {
+		return silverDelayRow{}, delayEvent{}, false, "missing_coordinates"
+	}
+	if bus.VoznjaBusID == nil {
+		return silverDelayRow{}, delayEvent{}, false, "missing_voznja_bus_id"
+	}
+
+	station, stationDistanceM, ok := nearestStation(*bus.Lon, *bus.Lat, store.Stations)
+	if !ok {
+		return silverDelayRow{}, delayEvent{}, false, "no_station_within_100m"
+	}
+
+	polazakID := strconv.Itoa(*bus.VoznjaBusID)
+	stops := store.DeparturesByPolazakID(polazakID)
+	if len(stops) == 0 {
+		return silverDelayRow{}, delayEvent{}, false, "no_schedule_for_polazak"
+	}
+
+	actual := ingestedAt.UTC()
+	var (
+		bestStop      staticdata.TimetableStopRow
+		bestScheduled time.Time
+		bestDiff      = scheduleWindow + time.Second
+		matched       bool
+	)
+
+	for _, stop := range stops {
+		if stop.StanicaID != station.StanicaID {
+			continue
+		}
+
+		scheduled, parseErr := parseScheduleTimeUTC(stop.Polazak, actual)
+		if parseErr != nil {
+			continue
+		}
+
+		diff := actual.Sub(scheduled)
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff <= scheduleWindow && diff < bestDiff {
+			bestStop = stop
+			bestScheduled = scheduled
+			bestDiff = diff
+			matched = true
+		}
+	}
+
+	if !matched {
+		return silverDelayRow{}, delayEvent{}, false, "no_schedule_within_5m"
+	}
+
+	delaySeconds := int64(actual.Sub(bestScheduled).Seconds())
+	gbr := intPtrToInt64Ptr(bus.GBR)
+	resultRow := silverDelayRow{
+		IngestedAt:     bronzeRow.IngestedAt,
+		IngestedDate:   bronzeRow.IngestedDate,
+		PolazakID:      polazakID,
+		VoznjaBusID:    int64(*bus.VoznjaBusID),
+		GBR:            gbr,
+		StationID:      int64(station.StanicaID),
+		StationName:    station.Naziv,
+		DistanceM:      stationDistanceM,
+		LinVarID:       bestStop.LinVarID,
+		BrojLinije:     bestStop.BrojLinije,
+		ScheduledTime:  bestScheduled.Format(time.RFC3339Nano),
+		ActualTime:     actual.Format(time.RFC3339Nano),
+		DelaySeconds:   delaySeconds,
+		KafkaTopic:     bronzeRow.KafkaTopic,
+		KafkaPartition: bronzeRow.KafkaPartition,
+		KafkaOffset:    bronzeRow.KafkaOffset,
+	}
+
+	event := delayEvent{
+		PolazakID:     polazakID,
+		VoznjaBusID:   int64(*bus.VoznjaBusID),
+		GBR:           gbr,
+		StationID:     int64(station.StanicaID),
+		StationName:   station.Naziv,
+		DistanceM:     stationDistanceM,
+		LinVarID:      bestStop.LinVarID,
+		BrojLinije:    bestStop.BrojLinije,
+		ScheduledTime: bestScheduled.Format(time.RFC3339Nano),
+		ActualTime:    actual.Format(time.RFC3339Nano),
+		DelaySeconds:  delaySeconds,
+	}
+
+	return resultRow, event, true, ""
+}
+
+func nearestStation(lon, lat float64, stations []staticdata.Station) (staticdata.Station, float64, bool) {
+	var (
+		bestStation  staticdata.Station
+		bestDistance = math.MaxFloat64
+		found        bool
+	)
+
+	for _, station := range stations {
+		if station.GpsX == nil || station.GpsY == nil {
+			continue
+		}
+
+		distance := haversineMeters(lat, lon, *station.GpsY, *station.GpsX)
+		if distance >= stationMatchMeters {
+			continue
+		}
+
+		if !found || distance < bestDistance {
+			bestStation = station
+			bestDistance = distance
+			found = true
+		}
+	}
+
+	if !found {
+		return staticdata.Station{}, 0, false
+	}
+
+	return bestStation, bestDistance, true
+}
+
+func haversineMeters(lat1, lon1, lat2, lon2 float64) float64 {
+	lat1Rad := degreesToRadians(lat1)
+	lat2Rad := degreesToRadians(lat2)
+	deltaLat := degreesToRadians(lat2 - lat1)
+	deltaLon := degreesToRadians(lon2 - lon1)
+
+	a := math.Sin(deltaLat/2)*math.Sin(deltaLat/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(deltaLon/2)*math.Sin(deltaLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return earthRadiusMeters * c
+}
+
+func degreesToRadians(degrees float64) float64 {
+	return degrees * math.Pi / 180
+}
+
+func parseScheduleTimeUTC(value string, actual time.Time) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, fmt.Errorf("empty schedule time")
+	}
+
+	parts := strings.Split(value, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return time.Time{}, fmt.Errorf("invalid schedule time %q", value)
+	}
+
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid hour %q: %w", parts[0], err)
+	}
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid minute %q: %w", parts[1], err)
+	}
+	second := 0
+	if len(parts) == 3 {
+		secPart := parts[2]
+		if dot := strings.Index(secPart, "."); dot >= 0 {
+			secPart = secPart[:dot]
+		}
+		second, err = strconv.Atoi(secPart)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("invalid second %q: %w", secPart, err)
+		}
+	}
+
+	base := time.Date(actual.Year(), actual.Month(), actual.Day(), hour, minute, second, 0, time.UTC)
+	candidates := []time.Time{base.Add(-24 * time.Hour), base, base.Add(24 * time.Hour)}
+	best := candidates[0]
+	bestAbs := absDuration(actual.Sub(best))
+
+	for _, candidate := range candidates[1:] {
+		candidateAbs := absDuration(actual.Sub(candidate))
+		if candidateAbs < bestAbs {
+			best = candidate
+			bestAbs = candidateAbs
+		}
+	}
+
+	return best, nil
+}
+
+func absDuration(value time.Duration) time.Duration {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func intPtrToInt64Ptr(value *int) *int64 {
