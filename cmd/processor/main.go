@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/EdiProdan/arRIval/internal/autotrolej"
+	"github.com/EdiProdan/arRIval/internal/metrics"
 	"github.com/EdiProdan/arRIval/internal/staticdata"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/parquet"
@@ -31,10 +33,17 @@ const (
 	defaultBronzeDir     = "data/bronze"
 	defaultSilverDir     = "data/silver"
 	defaultStaticDir     = "data"
+	defaultMetricsAddr   = ":9102"
 	stationMatchMeters   = 100.0
 	scheduleWindow       = 5 * time.Minute
 	earthRadiusMeters    = 6371000.0
 )
+
+type processorMetrics struct {
+	messagesProcessed prometheus.Counter
+	processingLagSec  prometheus.Histogram
+	delaySeconds      prometheus.Histogram
+}
 
 type bronzePositionRow struct {
 	IngestedAt     string   `parquet:"name=ingested_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
@@ -115,6 +124,10 @@ func main() {
 	bronzeDir := getenv("ARRIVAL_BRONZE_DIR", defaultBronzeDir)
 	silverDir := getenv("ARRIVAL_SILVER_DIR", defaultSilverDir)
 	staticDir := getenv("ARRIVAL_STATIC_DIR", defaultStaticDir)
+	metricsAddr := getenv("ARRIVAL_PROCESSOR_METRICS_ADDR", defaultMetricsAddr)
+
+	collector := newProcessorMetrics()
+	metrics.StartServer(ctx, metricsAddr)
 
 	store, err := staticdata.LoadFromDir(staticDir)
 	if err != nil {
@@ -170,13 +183,18 @@ func main() {
 
 		var commitRecords []*kgo.Record
 		fetches.EachRecord(func(rec *kgo.Record) {
-			commit, published, writeErr := processRecord(ctx, bw, sw, producer, outputTopic, store, rec)
+			if !rec.Timestamp.IsZero() {
+				collector.processingLagSec.Observe(time.Since(rec.Timestamp).Seconds())
+			}
+
+			commit, published, writeErr := processRecord(ctx, bw, sw, producer, outputTopic, store, collector, rec)
 			if writeErr != nil {
 				log.Printf("status=error stage=process partition=%d offset=%d err=%v", rec.Partition, rec.Offset, writeErr)
 				return
 			}
 
 			messageCount++
+			collector.messagesProcessed.Inc()
 			publishedCount += published
 			if commit {
 				commitRecords = append(commitRecords, rec)
@@ -191,7 +209,7 @@ func main() {
 	log.Printf("processor stopped: messages=%d bronze_rows=%d silver_rows=%d published=%d", messageCount, bw.rowsWritten, sw.rowsWritten, publishedCount)
 }
 
-func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWriter, producer *kgo.Client, outputTopic string, store *staticdata.Store, rec *kgo.Record) (bool, int64, error) {
+func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWriter, producer *kgo.Client, outputTopic string, store *staticdata.Store, collector processorMetrics, rec *kgo.Record) (bool, int64, error) {
 	var payload autotrolej.AutobusiResponse
 	if err := json.Unmarshal(rec.Value, &payload); err != nil {
 		log.Printf("status=error stage=unmarshal partition=%d offset=%d err=%v", rec.Partition, rec.Offset, err)
@@ -240,6 +258,7 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 			return false, published, fmt.Errorf("publish delay event: %w", err)
 		}
 
+		collector.delaySeconds.Observe(float64(event.DelaySeconds))
 		published++
 		log.Printf("status=ok stage=delay_publish topic=%s partition=%d offset=%d station_id=%d delay_seconds=%d", outputTopic, rec.Partition, rec.Offset, event.StationID, event.DelaySeconds)
 	}
@@ -253,6 +272,33 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 	)
 
 	return true, published, nil
+}
+
+func newProcessorMetrics() processorMetrics {
+	messagesProcessed := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrival_processor_messages_processed_total",
+		Help: "Total number of Kafka records processed by processor.",
+	})
+
+	processingLagSec := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "arrival_processor_processing_lag_seconds",
+		Help:    "Lag between Kafka record timestamp and processor handling time.",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	delaySeconds := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "arrival_processor_delay_seconds",
+		Help:    "Distribution of computed bus delay values in seconds.",
+		Buckets: []float64{-1800, -900, -300, -120, -60, -30, 0, 30, 60, 120, 300, 600, 900, 1800, 3600},
+	})
+
+	prometheus.MustRegister(messagesProcessed, processingLagSec, delaySeconds)
+
+	return processorMetrics{
+		messagesProcessed: messagesProcessed,
+		processingLagSec:  processingLagSec,
+		delaySeconds:      delaySeconds,
+	}
 }
 
 func (bw *bronzeDailyWriter) Write(row bronzePositionRow) error {

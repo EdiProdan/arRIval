@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/EdiProdan/arRIval/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/parquet"
@@ -27,9 +29,14 @@ const (
 	defaultInputTopic    = "bus-delays"
 	defaultConsumerGroup = "arrival-aggregator"
 	defaultGoldDir       = "data/gold"
+	defaultMetricsAddr   = ":9103"
 	defaultOnTimeSeconds = 300
 	flushInterval        = 30 * time.Second
 )
+
+type aggregatorMetrics struct {
+	aggregationsComputed prometheus.Counter
+}
 
 type delayEvent struct {
 	PolazakID     string `json:"polazak_id"`
@@ -77,6 +84,10 @@ func main() {
 	consumerGroup := getenv("ARRIVAL_AGGREGATOR_GROUP", defaultConsumerGroup)
 	goldDir := getenv("ARRIVAL_GOLD_DIR", defaultGoldDir)
 	onTimeSeconds := parseInt(getenv("ARRIVAL_ON_TIME_SECONDS", fmt.Sprintf("%d", defaultOnTimeSeconds)), defaultOnTimeSeconds)
+	metricsAddr := getenv("ARRIVAL_AGGREGATOR_METRICS_ADDR", defaultMetricsAddr)
+
+	collector := newAggregatorMetrics()
+	metrics.StartServer(ctx, metricsAddr)
 
 	consumer, err := kgo.NewClient(
 		kgo.SeedBrokers(brokers...),
@@ -127,18 +138,35 @@ func main() {
 		case <-ctx.Done():
 			continue
 		case <-ticker.C:
-			if err := flushGold(goldDir, state); err != nil {
+			rows, err := flushGold(goldDir, state)
+			if err != nil {
 				log.Printf("status=error stage=flush err=%v", err)
+			} else {
+				collector.aggregationsComputed.Add(float64(rows))
 			}
 		default:
 		}
 	}
 
-	if err := flushGold(goldDir, state); err != nil {
+	rows, err := flushGold(goldDir, state)
+	if err != nil {
 		log.Printf("status=error stage=flush err=%v", err)
+	} else {
+		collector.aggregationsComputed.Add(float64(rows))
 	}
 
 	log.Printf("aggregator stopped: consumed=%d buckets=%d", consumed, len(state))
+}
+
+func newAggregatorMetrics() aggregatorMetrics {
+	aggregationsComputed := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrival_aggregator_aggregations_computed_total",
+		Help: "Total number of route-hour aggregation rows computed.",
+	})
+
+	prometheus.MustRegister(aggregationsComputed)
+
+	return aggregatorMetrics{aggregationsComputed: aggregationsComputed}
 }
 
 func consumeDelayRecord(state map[aggregateKey]*aggregateBucket, rec *kgo.Record, onTimeSeconds int) error {
@@ -178,9 +206,9 @@ func consumeDelayRecord(state map[aggregateKey]*aggregateBucket, rec *kgo.Record
 	return nil
 }
 
-func flushGold(goldDir string, state map[aggregateKey]*aggregateBucket) error {
+func flushGold(goldDir string, state map[aggregateKey]*aggregateBucket) (int64, error) {
 	if len(state) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -224,12 +252,18 @@ func flushGold(goldDir string, state map[aggregateKey]*aggregateBucket) error {
 		})
 
 		if err := writeGoldDay(goldDir, date, rows); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
 	log.Printf("status=ok stage=flush dates=%d buckets=%d", len(byDate), len(state))
-	return nil
+
+	var rowsComputed int64
+	for _, rows := range byDate {
+		rowsComputed += int64(len(rows))
+	}
+
+	return rowsComputed, nil
 }
 
 func writeGoldDay(baseDir, date string, rows []goldStatsRow) error {

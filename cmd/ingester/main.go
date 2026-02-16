@@ -13,16 +13,25 @@ import (
 	"time"
 
 	"github.com/EdiProdan/arRIval/internal/autotrolej"
+	"github.com/EdiProdan/arRIval/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 const (
-	defaultAPIBaseURL = "https://www.rijekaplus.hr"
-	defaultBrokers    = "localhost:19092"
-	defaultTopic      = "bus-positions-raw"
-	pollInterval      = 30 * time.Second
-	produceTimeout    = 15 * time.Second
+	defaultAPIBaseURL  = "https://www.rijekaplus.hr"
+	defaultBrokers     = "localhost:19092"
+	defaultTopic       = "bus-positions-raw"
+	defaultMetricsAddr = ":9101"
+	pollInterval       = 30 * time.Second
+	produceTimeout     = 15 * time.Second
 )
+
+type ingesterMetrics struct {
+	pollTotal      prometheus.Counter
+	apiLatencySec  prometheus.Histogram
+	errorTotalByOp *prometheus.CounterVec
+}
 
 func main() {
 	if err := loadDotEnv(".env"); err != nil {
@@ -37,6 +46,10 @@ func main() {
 	password := firstNonEmpty(os.Getenv("ARRIVAL_API_PASS"), os.Getenv("ARRIVAL_API_PASSWORD"))
 	brokers := splitCSV(getenv("ARRIVAL_KAFKA_BROKERS", defaultBrokers))
 	topic := getenv("ARRIVAL_KAFKA_TOPIC", defaultTopic)
+	metricsAddr := getenv("ARRIVAL_INGESTER_METRICS_ADDR", defaultMetricsAddr)
+
+	collector := newIngesterMetrics()
+	metrics.StartServer(ctx, metricsAddr)
 
 	apiClient, err := autotrolej.NewClient(autotrolej.Config{
 		BaseURL:  apiBaseURL,
@@ -63,13 +76,18 @@ func main() {
 
 		pollNumber++
 		polledAt := time.Now().UTC()
+		collector.pollTotal.Inc()
 
+		apiStart := time.Now()
 		response, err := apiClient.GetAutobusi(ctx)
+		collector.apiLatencySec.Observe(time.Since(apiStart).Seconds())
 		if err != nil {
+			collector.errorTotalByOp.WithLabelValues("fetch").Inc()
 			log.Printf("poll=%d status=error stage=fetch err=%v", pollNumber, err)
 		} else {
 			payload, marshalErr := json.Marshal(response)
 			if marshalErr != nil {
+				collector.errorTotalByOp.WithLabelValues("marshal").Inc()
 				log.Printf("poll=%d status=error stage=marshal err=%v", pollNumber, marshalErr)
 			} else {
 				record := &kgo.Record{Topic: topic, Value: payload}
@@ -78,6 +96,7 @@ func main() {
 				cancelPublish()
 
 				if produceErr != nil {
+					collector.errorTotalByOp.WithLabelValues("produce").Inc()
 					log.Printf("poll=%d status=error stage=produce err=%v", pollNumber, produceErr)
 				} else {
 					log.Printf(
@@ -99,6 +118,32 @@ func main() {
 	}
 
 	log.Printf("ingester stopped")
+}
+
+func newIngesterMetrics() ingesterMetrics {
+	pollTotal := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrival_ingester_poll_total",
+		Help: "Total number of ingester poll attempts.",
+	})
+
+	apiLatencySec := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "arrival_ingester_api_latency_seconds",
+		Help:    "API request latency for /autobusi calls.",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	errorTotalByOp := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "arrival_ingester_errors_total",
+		Help: "Total ingester errors by operation.",
+	}, []string{"stage"})
+
+	prometheus.MustRegister(pollTotal, apiLatencySec, errorTotalByOp)
+
+	return ingesterMetrics{
+		pollTotal:      pollTotal,
+		apiLatencySec:  apiLatencySec,
+		errorTotalByOp: errorTotalByOp,
+	}
 }
 
 func sleepOrDone(ctx context.Context, d time.Duration) bool {

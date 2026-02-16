@@ -52,6 +52,17 @@ Developer workspace for exploring and ingesting Rijeka AUTOTROLEJ transit data.
 	- `go run ./cmd/aggregator`
 	- Gold output: `data/gold/YYYY-MM-DD/stats.parquet` (UTC date)
 
+11. Step 7 (minimal): expose metrics and run Prometheus:
+	- default service metrics endpoints:
+		- ingester: `http://localhost:9101/metrics`
+		- processor: `http://localhost:9102/metrics`
+		- aggregator: `http://localhost:9103/metrics`
+	- start Prometheus:
+		- `docker compose up -d prometheus`
+	- verify targets:
+		- open `http://localhost:9090/targets`
+		- expected jobs: `ingester`, `processor`, `aggregator`
+
 Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`, `res`, and `err`.
 
 ## Optional: notebooks
@@ -69,7 +80,9 @@ Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`,
 - `cmd/roundtrip` - Kafka produce/consume smoke test
 - `cmd/staticsync` - one-shot static OpenData downloader into `data/`
 - `cmd/staticloader` - static dataset loader + summary counts
+- `deploy/prometheus` - Prometheus scrape configuration for Step 7 metrics
 - `internal/autotrolej` - AUTOTROLEJ API client package
+- `internal/metrics` - shared `/metrics` HTTP server helper
 - `internal/staticdata` - static JSON structs, loader, and lookup maps
 - `docs` - architecture/context, schema, implementation notes
 - `eda` - notebooks and raw cache used for analysis
@@ -78,6 +91,7 @@ Output is a JSON object from `/api/open/v1/voznired/autobusi` with fields `msg`,
 ## Documentation
 
 - `docs/overview.md`
+- `docs/architecture_snapshot.md`
 - `docs/data_schema.md`
 - `docs/implementation_plan.md`
 - `docs/autotrolej_static_eda.html`

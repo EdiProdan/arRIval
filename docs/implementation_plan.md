@@ -85,6 +85,8 @@ Update `docker-compose.yml` to include Prometheus, scraping all three services.
 
 **Deliverable:** Open Prometheus UI, see metrics from all services updating in real time.
 
+**Status:** Completed (minimal host-run services + Prometheus in Docker Compose)
+
 ---
 
 ## Step 8: Grafana Dashboards

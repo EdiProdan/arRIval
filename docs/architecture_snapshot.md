@@ -29,7 +29,14 @@ Primary responsibilities currently implemented:
   - Admin endpoint mapped: `localhost:19644`
   - Persistent volume: `redpanda_data`
 
-No other infrastructure services are currently defined in compose.
+- Prometheus, defined in `docker-compose.yml`
+  - Image: `prom/prometheus:v2.55.1`
+  - UI/API endpoint: `localhost:9090`
+  - Config mount: `deploy/prometheus/prometheus.yml`
+  - Scrape targets (minimal Step 7 mode):
+    - `host.docker.internal:9101` (ingester)
+    - `host.docker.internal:9102` (processor)
+    - `host.docker.internal:9103` (aggregator)
 
 ### 3.2 External Systems
 
@@ -54,6 +61,7 @@ No other infrastructure services are currently defined in compose.
   - `github.com/twmb/franz-go` (Kafka client)
   - `github.com/xitongsys/parquet-go`
   - `github.com/xitongsys/parquet-go-source`
+  - `github.com/prometheus/client_golang`
 
 ## 5. Executable Components (Binaries)
 
@@ -95,6 +103,12 @@ Behavior:
 - Marshals response and produces to configured Kafka topic
 - Produce timeout: `15s`
 - Logs poll status, bus count, topic, partition, offset, poll timestamp
+- Exposes Prometheus metrics endpoint on `/metrics`
+  - Default bind address: `:9101`
+- Metrics emitted:
+  - poll count
+  - API latency histogram
+  - error counter by stage
 - Graceful shutdown on SIGINT/SIGTERM
 
 ### 5.4 `cmd/processor`
@@ -122,6 +136,12 @@ Behavior:
 - Marks records for commit after successful processing path
 - On malformed JSON payload: logs error and still allows commit path for that record
 - If a day file already exists and writer is reopened, file is overwritten (warning logged)
+- Exposes Prometheus metrics endpoint on `/metrics`
+  - Default bind address: `:9102`
+- Metrics emitted:
+  - processed message counter
+  - processing lag histogram
+  - delay-seconds histogram
 
 Parquet row schema (`bronzePositionRow`):
 - `ingested_at` (string)
@@ -181,6 +201,10 @@ Behavior:
 - Gold output path pattern:
   - `data/gold/YYYY-MM-DD/stats.parquet`
 - Periodically flushes and also flushes on graceful shutdown
+- Exposes Prometheus metrics endpoint on `/metrics`
+  - Default bind address: `:9103`
+- Metrics emitted:
+  - aggregations computed counter
 
 ## 6. Internal Packages and Responsibilities
 
@@ -278,6 +302,14 @@ Additional aggregator variables:
 - `ARRIVAL_ON_TIME_SECONDS`
   - Default: `300`
 
+Metrics endpoint variables:
+- `ARRIVAL_INGESTER_METRICS_ADDR`
+  - Default: `:9101`
+- `ARRIVAL_PROCESSOR_METRICS_ADDR`
+  - Default: `:9102`
+- `ARRIVAL_AGGREGATOR_METRICS_ADDR`
+  - Default: `:9103`
+
 ### 7.2 Dotenv Loading Pattern
 
 - `cmd/apiclient`, `cmd/ingester`, `cmd/processor`, and `cmd/aggregator` load `.env` from repository root when file exists.
@@ -350,6 +382,7 @@ Typical current sequence:
 5. Run `cmd/ingester`
 6. Run `cmd/processor`
 7. Run `cmd/aggregator`
+8. Start Prometheus via compose and verify targets in UI/API
 
 ## 11. Error Handling and Resilience Characteristics
 
@@ -377,5 +410,7 @@ Typical current sequence:
 - `cmd/roundtrip/main.go`
 - `cmd/staticsync/main.go`
 - `cmd/staticloader/main.go`
+- `deploy/prometheus/prometheus.yml`
 - `internal/autotrolej/client.go`
+- `internal/metrics/metrics.go`
 - `internal/staticdata/staticdata.go`
