@@ -2,7 +2,7 @@
 
 ## 1. Document Scope
 
-This document describes the currently implemented architecture in this repository as of 2026-02-15.
+This document describes the currently implemented architecture in this repository as of 2026-02-16.
 It includes only executable components, runtime dependencies, and data flows present in code and configuration.
 
 ## 2. System Context
@@ -13,7 +13,8 @@ Primary responsibilities currently implemented:
 - Authenticate against AUTOTROLEJ Open API
 - Poll live bus positions
 - Publish raw payloads to Kafka-compatible broker (Redpanda)
-- Consume raw topic and materialize Bronze Parquet output
+- Consume raw topic and materialize Bronze+Silver Parquet output
+- Consume delay topic and materialize Gold Parquet route-hour aggregates
 - Download and load static OpenData reference datasets
 - Provide a Kafka roundtrip connectivity smoke test
 
@@ -165,6 +166,22 @@ Behavior:
 - Directory exists but currently contains no source files.
 - No executable is currently implemented for this component.
 
+### 5.8 `cmd/aggregator`
+
+Purpose:
+- Consume delay events and materialize Gold route-hour aggregations.
+
+Behavior:
+- Loads `.env` if present
+- Consumes delay topic in consumer group mode (default topic `bus-delays`)
+- Buckets events by `actual_time` hour (UTC) and route (`broj_linije`)
+- Computes per-bucket metrics: average delay, p95, p99, on-time percentage
+- On-time rule default: absolute delay <= 300 seconds
+- Writes date-partitioned Gold Parquet output with Snappy compression
+- Gold output path pattern:
+  - `data/gold/YYYY-MM-DD/stats.parquet`
+- Periodically flushes and also flushes on graceful shutdown
+
 ## 6. Internal Packages and Responsibilities
 
 ### 6.1 `internal/autotrolej`
@@ -253,9 +270,17 @@ Additional processor variables:
 - `ARRIVAL_STATIC_DIR`
   - Default: `data`
 
+Additional aggregator variables:
+- `ARRIVAL_AGGREGATOR_GROUP`
+  - Default: `arrival-aggregator`
+- `ARRIVAL_GOLD_DIR`
+  - Default: `data/gold`
+- `ARRIVAL_ON_TIME_SECONDS`
+  - Default: `300`
+
 ### 7.2 Dotenv Loading Pattern
 
-- `cmd/apiclient`, `cmd/ingester`, and `cmd/processor` load `.env` from repository root when file exists.
+- `cmd/apiclient`, `cmd/ingester`, `cmd/processor`, and `cmd/aggregator` load `.env` from repository root when file exists.
 - Existing process environment values are not overwritten by `.env` loader logic.
 
 ## 8. Data Flow Architecture
@@ -270,6 +295,7 @@ Flow:
 5. processor writes rows into date-partitioned Bronze Parquet file
 6. processor enriches matched events and writes date-partitioned Silver delay rows
 7. processor publishes delay events to topic `bus-delays` (or configured delay topic)
+8. `cmd/aggregator` consumes delay events and writes route-hour Gold aggregates
 
 ### 8.2 Static Reference Data Flow
 
@@ -300,6 +326,9 @@ Flow:
 - Silver files (default):
   - `data/silver/YYYY-MM-DD/delays.parquet`
 
+- Gold files (default):
+  - `data/gold/YYYY-MM-DD/stats.parquet`
+
 ### 9.2 Kafka Topic Usage
 
 Current implemented topic usage:
@@ -309,6 +338,7 @@ Current implemented topic usage:
   - Also used by `cmd/roundtrip` for smoke testing unless overridden
 - Delay topic: `bus-delays`
   - Producer: `cmd/processor`
+  - Consumer: `cmd/aggregator`
 
 ## 10. Runtime Execution Order (Operational)
 
@@ -319,6 +349,7 @@ Typical current sequence:
 4. Run `cmd/staticsync` (optional static refresh)
 5. Run `cmd/ingester`
 6. Run `cmd/processor`
+7. Run `cmd/aggregator`
 
 ## 11. Error Handling and Resilience Characteristics
 
@@ -342,6 +373,7 @@ Typical current sequence:
 - `cmd/apiclient/main.go`
 - `cmd/ingester/main.go`
 - `cmd/processor/main.go`
+- `cmd/aggregator/main.go`
 - `cmd/roundtrip/main.go`
 - `cmd/staticsync/main.go`
 - `cmd/staticloader/main.go`

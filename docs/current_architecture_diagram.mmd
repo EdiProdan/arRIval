@@ -19,11 +19,13 @@ graph TB
 
     subgraph "Processing Layer"
         Processor[Processor Service<br/>Go - Bronze+Silver + delay events]
+        Aggregator[Aggregator Service<br/>Go - hourly route stats]
     end
 
     subgraph "Storage"
         Bronze["🥉 Bronze<br/>data/bronze/YYYY-MM-DD/<br/>positions.parquet"]
         Silver["🥈 Silver<br/>data/silver/YYYY-MM-DD/<br/>delays.parquet"]
+        Gold["🥇 Gold<br/>data/gold/YYYY-MM-DD/<br/>stats.parquet"]
         StaticFiles["Static JSON Files<br/>data/linije.json<br/>data/stanice.json<br/>data/voznired_dnevni.json"]
     end
 
@@ -48,6 +50,8 @@ graph TB
     Processor -->|write raw rows| Bronze
     Processor -->|write delay rows| Silver
     Processor -->|publish delay events| T2
+    T2 -->|consume delay events| Aggregator
+    Aggregator -->|write hourly route stats| Gold
 
     Roundtrip -->|produce test message| T1
     T1 -->|consume test message| Roundtrip
@@ -59,8 +63,8 @@ graph TB
     classDef utility fill:#f5f5f5,stroke:#6b7280
     classDef source fill:#eefaf3,stroke:#059669
 
-    class Bronze,Silver,StaticFiles storage
-    class Ingester,Processor service
+    class Bronze,Silver,Gold,StaticFiles storage
+    class Ingester,Processor,Aggregator service
     class T1,T2 broker
     class StaticSync,APIClient,Roundtrip,StaticLoader utility
     class API1,ODS1,ODS2,ODS3 source
