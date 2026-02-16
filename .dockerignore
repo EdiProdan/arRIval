@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+logs
+data/bronze
+data/silver
+data/gold
+eda
+*.ipynb
+*.csv
+*.parquet
+.tmp*

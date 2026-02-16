@@ -28,6 +28,77 @@ services:
       timeout: 5s
       retries: 10
 
+  staticsync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arrival-staticsync
+    command: ["staticsync", "-data-dir", "data"]
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: "no"
+
+  ingester:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arrival-ingester
+    command: ["ingester"]
+    env_file:
+      - .env
+    environment:
+      - ARRIVAL_KAFKA_BROKERS=redpanda:9092
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      staticsync:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arrival-processor
+    command: ["processor"]
+    env_file:
+      - .env
+    environment:
+      - ARRIVAL_KAFKA_BROKERS=redpanda:9092
+      - ARRIVAL_STATIC_DIR=data
+      - ARRIVAL_BRONZE_DIR=data/bronze
+      - ARRIVAL_SILVER_DIR=data/silver
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      staticsync:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  aggregator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arrival-aggregator
+    command: ["aggregator"]
+    env_file:
+      - .env
+    environment:
+      - ARRIVAL_KAFKA_BROKERS=redpanda:9092
+      - ARRIVAL_GOLD_DIR=data/gold
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      staticsync:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: arrival-prometheus
@@ -37,8 +108,10 @@ services:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - 9090:9090
-    extra_hosts:
-      - host.docker.internal:host-gateway
+    depends_on:
+      - ingester
+      - processor
+      - aggregator
 
   grafana:
     image: grafana/grafana:11.6.0

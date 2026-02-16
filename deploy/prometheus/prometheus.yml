@@ -5,12 +5,12 @@ global:
 scrape_configs:
   - job_name: ingester
     static_configs:
-      - targets: ["host.docker.internal:9101"]
+      - targets: ["ingester:9101"]
 
   - job_name: processor
     static_configs:
-      - targets: ["host.docker.internal:9102"]
+      - targets: ["processor:9102"]
 
   - job_name: aggregator
     static_configs:
-      - targets: ["host.docker.internal:9103"]
+      - targets: ["aggregator:9103"]

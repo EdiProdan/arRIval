@@ -17,7 +17,7 @@ Primary responsibilities currently implemented:
 - Consume delay topic and materialize Gold Parquet route-hour aggregates
 - Download and load static OpenData reference datasets
 - Provide a Kafka roundtrip connectivity smoke test
-- Expose and visualize service metrics via Prometheus + Grafana (minimal host-run services mode)
+- Expose and visualize service metrics via Prometheus + Grafana (all services wired in Docker Compose)
 
 ## 3. Runtime Topology
 
@@ -34,10 +34,10 @@ Primary responsibilities currently implemented:
   - Image: `prom/prometheus:v2.55.1`
   - UI/API endpoint: `localhost:9090`
   - Config mount: `deploy/prometheus/prometheus.yml`
-  - Scrape targets (minimal Step 7 mode):
-    - `host.docker.internal:9101` (ingester)
-    - `host.docker.internal:9102` (processor)
-    - `host.docker.internal:9103` (aggregator)
+  - Scrape targets:
+    - `ingester:9101`
+    - `processor:9102`
+    - `aggregator:9103`
 
 - Grafana, defined in `docker-compose.yml`
   - Image: `grafana/grafana:11.6.0`
@@ -47,6 +47,13 @@ Primary responsibilities currently implemented:
   - Default local credentials: `admin` / `admin`
   - Provisioned dashboard: `arRIval - Minimal Operations`
     - Includes live poll health, delay quantiles, system lag, and busiest/worst proxy panel
+
+- Application services, defined in `docker-compose.yml`
+  - `staticsync` (one-shot startup sync of static JSON files into `data/`)
+  - `ingester` (continuous API poller -> `bus-positions-raw`)
+  - `processor` (raw topic -> Bronze/Silver + `bus-delays`)
+  - `aggregator` (`bus-delays` -> Gold hourly route stats)
+  - Shared bind mount: `./data:/app/data`
 
 ### 3.2 External Systems
 

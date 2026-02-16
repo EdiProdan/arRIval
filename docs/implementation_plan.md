@@ -104,3 +104,5 @@ Add Grafana to Docker Compose with Prometheus as a data source. Build a single d
 Wire everything together. One `docker-compose up` starts all services. Let it run, verify data flows from API through Bronze/Silver/Gold and into Grafana. Write a short README section on how to run the full stack.
 
 **Deliverable:** Complete working system. Clone, add `.env`, `docker-compose up`, see dashboards.
+
+**Status:** Completed (compose-based end-to-end runtime with ingester/processor/aggregator + staticsync)

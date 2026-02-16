@@ -38,7 +38,7 @@ API Poller → Redpanda → Processor → Parquet (Bronze/Silver/Gold)
 
 ### **Observability (Minimal Step 8)**
 - Prometheus and Grafana run in Docker Compose
-- Services continue to run on host and expose `/metrics`
+- Ingester, processor, and aggregator also run in Docker Compose and expose `/metrics` on the internal network
 - Grafana auto-loads one provisioned dashboard: `arRIval - Minimal Operations`
 - Panels: live poll health, delay distribution, system lag, and busiest/worst **proxy** panel
 - Note: true per-route “worst/busiest” ranking is not exposed yet via Prometheus labels
