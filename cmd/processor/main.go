@@ -39,6 +39,14 @@ const (
 	earthRadiusMeters    = 6371000.0
 )
 
+var croatiaLoc = func() *time.Location {
+	loc, err := time.LoadLocation("Europe/Zagreb")
+	if err != nil {
+		panic("failed to load Europe/Zagreb timezone: " + err.Error())
+	}
+	return loc
+}()
+
 type processorMetrics struct {
 	messagesProcessed prometheus.Counter
 	processingLagSec  prometheus.Histogram
@@ -602,7 +610,8 @@ func parseScheduleTimeUTC(value string, actual time.Time) (time.Time, error) {
 		}
 	}
 
-	base := time.Date(actual.Year(), actual.Month(), actual.Day(), hour, minute, second, 0, time.UTC)
+	actualLocal := actual.In(croatiaLoc)
+	base := time.Date(actualLocal.Year(), actualLocal.Month(), actualLocal.Day(), hour, minute, second, 0, croatiaLoc)
 	candidates := []time.Time{base.Add(-24 * time.Hour), base, base.Add(24 * time.Hour)}
 	best := candidates[0]
 	bestAbs := absDuration(actual.Sub(best))
