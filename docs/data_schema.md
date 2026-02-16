@@ -196,8 +196,9 @@ Treat `(0, 0)` as invalid/no-position unless explicitly needed.
 ### 6.2 Time values
 
 - Static timetable `Polazak` is typically parsed as time-of-day (fractional seconds may appear).
-- Do not assume timezone from raw static field alone.
+- Static `Polazak` values are interpreted in local service timezone (`Europe/Zagreb`) when aligning with live events.
 - Live snapshot timestamps are captured by the client/runtime (UTC in current EDA workflow).
+- Processor matching uses local-date anchoring (Europe/Zagreb) for schedule candidates while keeping event timestamps in UTC.
 
 ## 7) Known Data Quality Patterns
 

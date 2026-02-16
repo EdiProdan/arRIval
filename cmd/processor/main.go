@@ -473,7 +473,7 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 			continue
 		}
 
-		scheduled, parseErr := parseScheduleTimeUTC(stop.Polazak, actual)
+		scheduled, parseErr := parseScheduleTimeLocalAligned(stop.Polazak, actual)
 		if parseErr != nil {
 			continue
 		}
@@ -579,7 +579,7 @@ func degreesToRadians(degrees float64) float64 {
 	return degrees * math.Pi / 180
 }
 
-func parseScheduleTimeUTC(value string, actual time.Time) (time.Time, error) {
+func parseScheduleTimeLocalAligned(value string, actual time.Time) (time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return time.Time{}, fmt.Errorf("empty schedule time")

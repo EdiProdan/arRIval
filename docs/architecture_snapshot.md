@@ -143,6 +143,7 @@ Behavior:
 - Emits one Parquet row per bus item from `res`
 - Partitions output by UTC date under Bronze directory
 - Performs nearest-station matching and schedule-window checks for delay enrichment
+- Parses static `Polazak` time-of-day using Europe/Zagreb local date context, then selects nearest day window (-24h/0/+24h) against actual UTC time
 - Writes matched delay rows into date-partitioned Silver Parquet files
 - Publishes matched delay events to output topic (default `bus-delays`)
 - Default output path pattern:
