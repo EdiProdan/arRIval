@@ -79,3 +79,4 @@ If running binaries directly with `go run`, set `ARRIVAL_KAFKA_BROKERS=localhost
 - `deploy/prometheus` - scrape configuration
 - `deploy/grafana` - provisioning and dashboard JSON
 - `data` - Bronze/Silver/Gold outputs and static datasets
+branch protection test
