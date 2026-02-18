@@ -14,7 +14,7 @@ Set real credentials in `.env` before startup.
 ## Monitor
 
 ```bash
-docker compose logs -f staticsync ingester processor aggregator
+docker compose logs -f staticsync ingester processor aggregator realtime
 ```
 
 ## Quick health checks
@@ -30,6 +30,12 @@ Observability:
 
 - Prometheus: <http://localhost:9090/targets>
 - Grafana: <http://localhost:3000>
+
+Realtime API:
+
+- Snapshot: <http://localhost:8080/v1/snapshot>
+- Health: <http://localhost:8080/healthz>
+- Readiness: <http://localhost:8080/readyz>
 
 Storage:
 

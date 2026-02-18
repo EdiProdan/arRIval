@@ -99,6 +99,26 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
+  realtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arrival-realtime
+    command: ["realtime"]
+    env_file:
+      - .env
+    environment:
+      - ARRIVAL_KAFKA_BROKERS=redpanda:9092
+      - ARRIVAL_REALTIME_HTTP_ADDR=:8080
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      staticsync:
+        condition: service_completed_successfully
+    ports:
+      - 8080:8080
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: arrival-prometheus
@@ -112,6 +132,7 @@ services:
       - ingester
       - processor
       - aggregator
+      - realtime
 
   grafana:
     image: grafana/grafana:11.6.0

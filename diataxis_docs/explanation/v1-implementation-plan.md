@@ -21,6 +21,8 @@ This plan is the high-level implementation sequence after MVP. Each phase is int
 - Pull requests are blocked on failing checks.
 - Baseline test coverage report is generated.
 
+**Status:** Completed
+
 ## Phase 2 — Shared contracts and refactor
 
 **Goal**: make core logic reusable and testable across services.
@@ -33,17 +35,28 @@ This plan is the high-level implementation sequence after MVP. Each phase is int
 - Shared event/data types are centralized and imported where needed.
 - Core logic is testable outside `package main`.
 
+**Status:** Completed
+
 ## Phase 3 — Realtime backend (WebSocket service)
 
 **Goal**: provide a stable stream for live clients.
 
-**Deliverable**: a websocket-serving backend that consumes processed events, provides an initial snapshot endpoint, and broadcasts incremental updates.
+**Deliverable**: a minimal websocket-serving backend that consumes `bus-positions-raw` + `bus-delays`, provides an in-memory `GET /v1/snapshot` endpoint, and broadcasts incremental `positions_batch` / `delay_update` events.
+
+**Scope notes (minimal)**:
+
+- Public read-only API (no auth, no replay, no persistence).
+- In-memory latest-state keyed by `voznja_bus_id`/`gbr` for positions and `voznja_bus_id + station_id` for delays.
+- Health/readiness + Prometheus connection/stream/state metrics.
+- Docker Compose + docs wiring for local end-to-end verification.
 
 **Exit criteria**:
 
 - Local end-to-end flow from pipeline to connected clients works reliably.
 - Connection lifecycle behavior is defined (connect, disconnect, reconnect).
 - Service health and connection metrics are exposed.
+
+**Status:** In Progress
 
 ## Phase 4 — Realtime UI (public read-only MVP)
 
