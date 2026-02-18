@@ -12,6 +12,20 @@ Canonical docs follow the Diátaxis structure in `diataxis_docs/`.
 - Reference: `diataxis_docs/reference/`
 - Explanation: `diataxis_docs/explanation/`
 
+## CI
+
+GitHub Actions runs a single `CI` workflow on every pull request and on pushes to `main`.
+
+The `quality` job runs:
+- `go vet ./...`
+- `go test ./... -coverprofile=coverage.out -covermode=atomic`
+- `go tool cover -func=coverage.out > coverage.txt`
+- `go build ./...`
+
+Coverage outputs are uploaded as the `coverage-report` artifact in each workflow run.
+
+For repository settings, protect `main` by requiring pull requests and the `CI / quality` check to pass before merge.
+
 ## Prerequisites
 
 - Docker + Docker Compose
