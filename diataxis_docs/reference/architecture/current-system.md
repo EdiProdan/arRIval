@@ -2,7 +2,7 @@
 
 ## 1. Document Scope
 
-This document describes the currently implemented architecture in this repository as of 2026-02-16.
+This document describes the currently implemented architecture in this repository as of 2026-02-18.
 It includes only executable components, runtime dependencies, and data flows present in code and configuration.
 
 ## 2. System Context
@@ -15,6 +15,7 @@ Primary responsibilities currently implemented:
 - Publish raw payloads to Kafka-compatible broker (Redpanda)
 - Consume raw topic and materialize Bronze+Silver Parquet output
 - Consume delay topic and materialize Gold Parquet route-hour aggregates
+- Serve realtime snapshot + websocket updates for clients
 - Download and load static OpenData reference datasets
 - Provide a Kafka roundtrip connectivity smoke test
 - Expose and visualize service metrics via Prometheus + Grafana (all services wired in Docker Compose)
@@ -38,6 +39,7 @@ Primary responsibilities currently implemented:
     - `ingester:9101`
     - `processor:9102`
     - `aggregator:9103`
+    - `realtime:9104`
 
 - Grafana, defined in `docker-compose.yml`
   - Image: `grafana/grafana:11.6.0`
@@ -53,6 +55,7 @@ Primary responsibilities currently implemented:
   - `ingester` (continuous API poller -> `bus-positions-raw`)
   - `processor` (raw topic -> Bronze/Silver + `bus-delays`)
   - `aggregator` (`bus-delays` -> Gold hourly route stats)
+  - `realtime` (`bus-positions-raw` + `bus-delays` -> snapshot + websocket API)
   - Shared bind mount: `./data:/app/data`
 
 ### 3.2 External Systems
@@ -224,6 +227,44 @@ Behavior:
 - Metrics emitted:
   - aggregations computed counter
 
+### 5.9 `cmd/realtime`
+
+Purpose:
+- Consume live/delay topics and expose public read-only realtime APIs.
+
+Behavior:
+- Loads `.env` if present
+- Consumes both topics in one consumer group:
+  - `bus-positions-raw`
+  - `bus-delays`
+- Parses raw live payloads (`autotrolej.AutobusiResponse`) into normalized realtime positions
+- Ignores invalid position rows (missing coordinates or missing both IDs)
+- Maintains in-memory latest state keyed by:
+  - position key: `voznja_bus_id` if present, otherwise `gbr`
+  - delay key: `voznja_bus_id + station_id`
+- Applies TTL pruning to in-memory state:
+  - positions TTL default `5m`
+  - delays TTL default `90m`
+- Exposes HTTP API:
+  - `GET /healthz`
+  - `GET /readyz`
+  - `GET /v1/snapshot`
+  - `GET /v1/ws` (websocket)
+- Broadcasts websocket envelopes:
+  - `positions_batch`
+  - `delay_update`
+  - `heartbeat`
+- Uses bounded per-client buffers and drops slow clients
+- Exposes Prometheus metrics endpoint on `/metrics`
+  - Default bind address: `:9104`
+- Metrics emitted:
+  - consumed Kafka records by topic
+  - websocket connection lifecycle and drops
+  - websocket messages sent by type
+  - snapshot request count
+  - in-memory state sizes
+  - invalid positions ignored count
+
 ## 6. Internal Packages and Responsibilities
 
 ### 6.1 `internal/autotrolej`
@@ -279,6 +320,26 @@ Expected file inputs in data directory:
 - `linije.json`
 - `voznired_dnevni.json`
 
+### 6.3 `internal/realtime`
+
+Primary types:
+- `Store` (in-memory latest state with TTL pruning)
+- `Hub` (websocket client lifecycle and broadcast fanout)
+- `Server` (HTTP endpoints + record handlers + readiness)
+
+Public contract highlights:
+- `ParsePositionsRecord(payload, observedAt)` for raw topic parsing
+- `ParseDelayRecord(payload)` for delay topic parsing
+- `Store.UpsertPositions`, `Store.UpsertDelay`, `Store.Snapshot`
+- `Server.HandlePositionsRecord`, `Server.HandleDelayRecord`, `Server.Routes`
+
+Behavior:
+- Position normalization and filtering from raw `/autobusi` envelopes
+- Deterministic keying (`voznja_bus_id` or `gbr`) for latest position replacement
+- Delay keying (`voznja_bus_id + station_id`) for latest delay replacement
+- Websocket broadcast types: `positions_batch`, `delay_update`, `heartbeat`
+- Snapshot response generation with stable ordering and metadata counts
+
 ## 7. Configuration Contract
 
 ### 7.1 Environment Variables
@@ -320,6 +381,20 @@ Additional aggregator variables:
 - `ARRIVAL_ON_TIME_SECONDS`
   - Default: `300`
 
+Additional realtime variables:
+- `ARRIVAL_REALTIME_GROUP`
+  - Default: `arrival-realtime`
+- `ARRIVAL_REALTIME_HTTP_ADDR`
+  - Default: `:8080`
+- `ARRIVAL_REALTIME_POSITIONS_TTL`
+  - Default: `5m`
+- `ARRIVAL_REALTIME_DELAYS_TTL`
+  - Default: `90m`
+- `ARRIVAL_REALTIME_WS_PING_INTERVAL`
+  - Default: `20s`
+- `ARRIVAL_REALTIME_WS_CLIENT_BUFFER`
+  - Default: `128`
+
 Metrics endpoint variables:
 - `ARRIVAL_INGESTER_METRICS_ADDR`
   - Default: `:9101`
@@ -327,10 +402,12 @@ Metrics endpoint variables:
   - Default: `:9102`
 - `ARRIVAL_AGGREGATOR_METRICS_ADDR`
   - Default: `:9103`
+- `ARRIVAL_REALTIME_METRICS_ADDR`
+  - Default: `:9104`
 
 ### 7.2 Dotenv Loading Pattern
 
-- `cmd/apiclient`, `cmd/ingester`, `cmd/processor`, and `cmd/aggregator` load `.env` from repository root when file exists.
+- `cmd/apiclient`, `cmd/ingester`, `cmd/processor`, `cmd/aggregator`, and `cmd/realtime` load `.env` from repository root when file exists.
 - Existing process environment values are not overwritten by `.env` loader logic.
 
 ## 8. Data Flow Architecture
@@ -346,6 +423,7 @@ Flow:
 6. processor enriches matched events and writes date-partitioned Silver delay rows
 7. processor publishes delay events to topic `bus-delays` (or configured delay topic)
 8. `cmd/aggregator` consumes delay events and writes route-hour Gold aggregates
+9. `cmd/realtime` consumes both topics and serves snapshot + websocket updates from in-memory latest state
 
 ### 8.2 Static Reference Data Flow
 
@@ -385,10 +463,12 @@ Current implemented topic usage:
 - Primary topic: `bus-positions-raw`
   - Producer: `cmd/ingester`
   - Consumer: `cmd/processor`
+  - Consumer: `cmd/realtime`
   - Also used by `cmd/roundtrip` for smoke testing unless overridden
 - Delay topic: `bus-delays`
   - Producer: `cmd/processor`
   - Consumer: `cmd/aggregator`
+  - Consumer: `cmd/realtime`
 
 ## 10. Runtime Execution Order (Operational)
 
@@ -400,8 +480,9 @@ Typical current sequence:
 5. Run `cmd/ingester`
 6. Run `cmd/processor`
 7. Run `cmd/aggregator`
-8. Start Prometheus via compose and verify targets in UI/API
-9. Start Grafana via compose and verify provisioned dashboard loads
+8. Run `cmd/realtime`
+9. Start Prometheus via compose and verify targets in UI/API
+10. Start Grafana via compose and verify provisioned dashboard loads
 
 ## 11. Error Handling and Resilience Characteristics
 
@@ -426,6 +507,7 @@ Typical current sequence:
 - `cmd/ingester/main.go`
 - `cmd/processor/main.go`
 - `cmd/aggregator/main.go`
+- `cmd/realtime/main.go`
 - `cmd/roundtrip/main.go`
 - `cmd/staticsync/main.go`
 - `cmd/staticloader/main.go`
@@ -436,3 +518,9 @@ Typical current sequence:
 - `internal/autotrolej/client.go`
 - `internal/metrics/metrics.go`
 - `internal/staticdata/staticdata.go`
+- `internal/realtime/parser.go`
+- `internal/realtime/store.go`
+- `internal/realtime/hub.go`
+- `internal/realtime/server.go`
+- `internal/realtime/ws.go`
+- `internal/contracts/realtime.go`

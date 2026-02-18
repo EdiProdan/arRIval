@@ -41,23 +41,28 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
    - `docker compose up --build -d`
 
 3. Watch service logs:
-   - `docker compose logs -f staticsync ingester processor aggregator`
+   - `docker compose logs -f staticsync ingester processor aggregator realtime`
 
 4. Verify Kafka flow:
    - raw topic: `docker compose exec redpanda rpk topic consume bus-positions-raw -n 1`
    - delay topic: `docker compose exec redpanda rpk topic consume bus-delays -n 1`
 
-5. Verify Parquet outputs (UTC date partition):
+5. Verify realtime API:
+   - snapshot: `curl http://localhost:8080/v1/snapshot`
+   - health: `curl http://localhost:8080/healthz`
+   - readiness: `curl http://localhost:8080/readyz`
+
+6. Verify Parquet outputs (UTC date partition):
    - Bronze: `data/bronze/YYYY-MM-DD/positions.parquet`
    - Silver: `data/silver/YYYY-MM-DD/delays.parquet`
    - Gold: `data/gold/YYYY-MM-DD/stats.parquet`
 
-6. Verify observability:
+7. Verify observability:
    - Prometheus targets: `http://localhost:9090/targets`
    - Grafana: `http://localhost:3000` (`admin` / `admin`)
    - Dashboard: `arRIval - Minimal Operations`
 
-7. Stop stack:
+8. Stop stack:
    - `docker compose down`
 
 ## Notes
@@ -75,6 +80,7 @@ If running binaries directly with `go run`, set `ARRIVAL_KAFKA_BROKERS=localhost
 - `cmd/ingester` - polls `/autobusi`, publishes raw snapshots
 - `cmd/processor` - writes Bronze/Silver and publishes delay events
 - `cmd/aggregator` - writes Gold route-hour aggregates
+- `cmd/realtime` - serves snapshot + websocket realtime updates
 - `cmd/staticsync` - one-shot static data sync
 - `deploy/prometheus` - scrape configuration
 - `deploy/grafana` - provisioning and dashboard JSON
