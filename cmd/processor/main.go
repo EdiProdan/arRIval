@@ -1,22 +1,21 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/EdiProdan/arRIval/internal/autotrolej"
+	"github.com/EdiProdan/arRIval/internal/contracts"
+	"github.com/EdiProdan/arRIval/internal/envutil"
 	"github.com/EdiProdan/arRIval/internal/metrics"
+	"github.com/EdiProdan/arRIval/internal/processorlogic"
 	"github.com/EdiProdan/arRIval/internal/staticdata"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -36,10 +35,9 @@ const (
 	defaultMetricsAddr   = ":9102"
 	stationMatchMeters   = 100.0
 	scheduleWindow       = 15 * time.Minute
-	earthRadiusMeters    = 6371000.0
 )
 
-var croatiaLoc = func() *time.Location {
+var serviceLocation = func() *time.Location {
 	loc, err := time.LoadLocation("Europe/Zagreb")
 	if err != nil {
 		panic("failed to load Europe/Zagreb timezone: " + err.Error())
@@ -103,36 +101,22 @@ type silverDailyWriter struct {
 	rowsWritten int64
 }
 
-type delayEvent struct {
-	PolazakID     string  `json:"polazak_id"`
-	VoznjaBusID   int64   `json:"voznja_bus_id"`
-	GBR           *int64  `json:"gbr,omitempty"`
-	StationID     int64   `json:"station_id"`
-	StationName   string  `json:"station_name"`
-	DistanceM     float64 `json:"distance_m"`
-	LinVarID      string  `json:"lin_var_id"`
-	BrojLinije    string  `json:"broj_linije"`
-	ScheduledTime string  `json:"scheduled_time"`
-	ActualTime    string  `json:"actual_time"`
-	DelaySeconds  int64   `json:"delay_seconds"`
-}
-
 func main() {
-	if err := loadDotEnv(".env"); err != nil {
+	if err := envutil.LoadDotEnv(".env"); err != nil {
 		log.Fatalf("load .env: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	brokers := splitCSV(getenv("ARRIVAL_KAFKA_BROKERS", defaultBrokers))
-	inputTopic := getenv("ARRIVAL_KAFKA_TOPIC", defaultInputTopic)
-	outputTopic := getenv("ARRIVAL_KAFKA_DELAY_TOPIC", defaultOutputTopic)
-	consumerGroup := getenv("ARRIVAL_PROCESSOR_GROUP", defaultConsumerGroup)
-	bronzeDir := getenv("ARRIVAL_BRONZE_DIR", defaultBronzeDir)
-	silverDir := getenv("ARRIVAL_SILVER_DIR", defaultSilverDir)
-	staticDir := getenv("ARRIVAL_STATIC_DIR", defaultStaticDir)
-	metricsAddr := getenv("ARRIVAL_PROCESSOR_METRICS_ADDR", defaultMetricsAddr)
+	brokers := envutil.CSVEnv("ARRIVAL_KAFKA_BROKERS", defaultBrokers)
+	inputTopic := envutil.StringEnv("ARRIVAL_KAFKA_TOPIC", defaultInputTopic)
+	outputTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_TOPIC", defaultOutputTopic)
+	consumerGroup := envutil.StringEnv("ARRIVAL_PROCESSOR_GROUP", defaultConsumerGroup)
+	bronzeDir := envutil.StringEnv("ARRIVAL_BRONZE_DIR", defaultBronzeDir)
+	silverDir := envutil.StringEnv("ARRIVAL_SILVER_DIR", defaultSilverDir)
+	staticDir := envutil.StringEnv("ARRIVAL_STATIC_DIR", defaultStaticDir)
+	metricsAddr := envutil.StringEnv("ARRIVAL_PROCESSOR_METRICS_ADDR", defaultMetricsAddr)
 
 	collector := newProcessorMetrics()
 	metrics.StartServer(ctx, metricsAddr)
@@ -225,6 +209,11 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 	}
 
 	ingestedAt := time.Now().UTC()
+	matchCfg := processorlogic.Config{
+		StationMatchMeters: stationMatchMeters,
+		ScheduleWindow:     scheduleWindow,
+		ServiceLocation:    serviceLocation,
+	}
 	var published int64
 	for _, bus := range payload.Res {
 		row := bronzePositionRow{
@@ -246,16 +235,53 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 			return false, published, err
 		}
 
-		silverRow, event, ok, reason := buildDelay(ingestedAt, bus, row, store)
+		match, ok, reason := processorlogic.BuildDelay(processorlogic.MatchInput{
+			IngestedAt:     ingestedAt,
+			KafkaTopic:     rec.Topic,
+			KafkaPartition: rec.Partition,
+			KafkaOffset:    rec.Offset,
+			Bus:            bus,
+		}, store, matchCfg)
 		if !ok {
 			log.Printf("status=skip stage=delay_match reason=%s partition=%d offset=%d voznja_bus_id=%v", reason, rec.Partition, rec.Offset, bus.VoznjaBusID)
 			continue
 		}
 
+		silverRow := silverDelayRow{
+			IngestedAt:     row.IngestedAt,
+			IngestedDate:   row.IngestedDate,
+			PolazakID:      match.PolazakID,
+			VoznjaBusID:    match.VoznjaBusID,
+			GBR:            match.GBR,
+			StationID:      match.StationID,
+			StationName:    match.StationName,
+			DistanceM:      match.DistanceM,
+			LinVarID:       match.LinVarID,
+			BrojLinije:     match.BrojLinije,
+			ScheduledTime:  match.ScheduledTime.Format(time.RFC3339Nano),
+			ActualTime:     match.ActualTime.Format(time.RFC3339Nano),
+			DelaySeconds:   match.DelaySeconds,
+			KafkaTopic:     row.KafkaTopic,
+			KafkaPartition: row.KafkaPartition,
+			KafkaOffset:    row.KafkaOffset,
+		}
 		if err := sw.Write(silverRow); err != nil {
 			return false, published, err
 		}
 
+		event := contracts.DelayEvent{
+			PolazakID:     match.PolazakID,
+			VoznjaBusID:   match.VoznjaBusID,
+			GBR:           match.GBR,
+			StationID:     match.StationID,
+			StationName:   match.StationName,
+			DistanceM:     match.DistanceM,
+			LinVarID:      match.LinVarID,
+			BrojLinije:    match.BrojLinije,
+			ScheduledTime: match.ScheduledTime.Format(time.RFC3339Nano),
+			ActualTime:    match.ActualTime.Format(time.RFC3339Nano),
+			DelaySeconds:  match.DelaySeconds,
+		}
 		payloadBytes, err := json.Marshal(event)
 		if err != nil {
 			return false, published, fmt.Errorf("marshal delay event: %w", err)
@@ -441,274 +467,10 @@ func (sw *silverDailyWriter) Close() error {
 	return nil
 }
 
-func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePositionRow, store *staticdata.Store) (silverDelayRow, delayEvent, bool, string) {
-	if bus.Lon == nil || bus.Lat == nil {
-		return silverDelayRow{}, delayEvent{}, false, "missing_coordinates"
-	}
-	if bus.VoznjaBusID == nil {
-		return silverDelayRow{}, delayEvent{}, false, "missing_voznja_bus_id"
-	}
-
-	station, stationDistanceM, ok := nearestStation(*bus.Lon, *bus.Lat, store.Stations)
-	if !ok {
-		return silverDelayRow{}, delayEvent{}, false, "no_station_within_100m"
-	}
-
-	// Use voznjaBusId to determine the bus's line number.
-	tripStops := store.DeparturesByPolazakID(strconv.Itoa(*bus.VoznjaBusID))
-	if len(tripStops) == 0 {
-		return silverDelayRow{}, delayEvent{}, false, "no_line_for_polazak"
-	}
-	brojLinije := tripStops[0].BrojLinije
-
-	// Match against ALL departures at this station for this line.
-	lineStops := store.DeparturesByStationLine(station.StanicaID, brojLinije)
-	if len(lineStops) == 0 {
-		return silverDelayRow{}, delayEvent{}, false, "no_schedule_for_station_line"
-	}
-
-	actual := ingestedAt.UTC()
-	var (
-		bestStop      staticdata.TimetableStopRow
-		bestScheduled time.Time
-		bestDiff      = scheduleWindow + time.Second
-		matched       bool
-	)
-
-	for _, stop := range lineStops {
-		scheduled, parseErr := parseScheduleTimeLocalAligned(stop.Polazak, actual)
-		if parseErr != nil {
-			continue
-		}
-
-		diff := actual.Sub(scheduled)
-		if diff < 0 {
-			diff = -diff
-		}
-		if diff <= scheduleWindow && diff < bestDiff {
-			bestStop = stop
-			bestScheduled = scheduled
-			bestDiff = diff
-			matched = true
-		}
-	}
-
-	if !matched {
-		return silverDelayRow{}, delayEvent{}, false, "no_schedule_within_window"
-	}
-
-	scheduledUTC := bestScheduled.UTC()
-	actualUTC := actual.UTC()
-	delaySeconds := int64(actualUTC.Sub(scheduledUTC).Seconds())
-	gbr := intPtrToInt64Ptr(bus.GBR)
-	resultRow := silverDelayRow{
-		IngestedAt:     bronzeRow.IngestedAt,
-		IngestedDate:   bronzeRow.IngestedDate,
-		PolazakID:      bestStop.PolazakID,
-		VoznjaBusID:    int64(*bus.VoznjaBusID),
-		GBR:            gbr,
-		StationID:      int64(station.StanicaID),
-		StationName:    station.Naziv,
-		DistanceM:      stationDistanceM,
-		LinVarID:       bestStop.LinVarID,
-		BrojLinije:     bestStop.BrojLinije,
-		ScheduledTime:  scheduledUTC.Format(time.RFC3339Nano),
-		ActualTime:     actualUTC.Format(time.RFC3339Nano),
-		DelaySeconds:   delaySeconds,
-		KafkaTopic:     bronzeRow.KafkaTopic,
-		KafkaPartition: bronzeRow.KafkaPartition,
-		KafkaOffset:    bronzeRow.KafkaOffset,
-	}
-
-	event := delayEvent{
-		PolazakID:     bestStop.PolazakID,
-		VoznjaBusID:   int64(*bus.VoznjaBusID),
-		GBR:           gbr,
-		StationID:     int64(station.StanicaID),
-		StationName:   station.Naziv,
-		DistanceM:     stationDistanceM,
-		LinVarID:      bestStop.LinVarID,
-		BrojLinije:    bestStop.BrojLinije,
-		ScheduledTime: scheduledUTC.Format(time.RFC3339Nano),
-		ActualTime:    actualUTC.Format(time.RFC3339Nano),
-		DelaySeconds:  delaySeconds,
-	}
-
-	return resultRow, event, true, ""
-}
-
-func nearestStation(lon, lat float64, stations []staticdata.Station) (staticdata.Station, float64, bool) {
-	var (
-		bestStation  staticdata.Station
-		bestDistance = math.MaxFloat64
-		found        bool
-	)
-
-	for _, station := range stations {
-		if station.GpsX == nil || station.GpsY == nil {
-			continue
-		}
-
-		distance := haversineMeters(lat, lon, *station.GpsY, *station.GpsX)
-		if distance >= stationMatchMeters {
-			continue
-		}
-
-		if !found || distance < bestDistance {
-			bestStation = station
-			bestDistance = distance
-			found = true
-		}
-	}
-
-	if !found {
-		return staticdata.Station{}, 0, false
-	}
-
-	return bestStation, bestDistance, true
-}
-
-func haversineMeters(lat1, lon1, lat2, lon2 float64) float64 {
-	lat1Rad := degreesToRadians(lat1)
-	lat2Rad := degreesToRadians(lat2)
-	deltaLat := degreesToRadians(lat2 - lat1)
-	deltaLon := degreesToRadians(lon2 - lon1)
-
-	a := math.Sin(deltaLat/2)*math.Sin(deltaLat/2) +
-		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(deltaLon/2)*math.Sin(deltaLon/2)
-	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-	return earthRadiusMeters * c
-}
-
-func degreesToRadians(degrees float64) float64 {
-	return degrees * math.Pi / 180
-}
-
-func parseScheduleTimeLocalAligned(value string, actual time.Time) (time.Time, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return time.Time{}, fmt.Errorf("empty schedule time")
-	}
-
-	parts := strings.Split(value, ":")
-	if len(parts) < 2 || len(parts) > 3 {
-		return time.Time{}, fmt.Errorf("invalid schedule time %q", value)
-	}
-
-	hour, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid hour %q: %w", parts[0], err)
-	}
-	minute, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return time.Time{}, fmt.Errorf("invalid minute %q: %w", parts[1], err)
-	}
-	second := 0
-	if len(parts) == 3 {
-		secPart := parts[2]
-		if dot := strings.Index(secPart, "."); dot >= 0 {
-			secPart = secPart[:dot]
-		}
-		second, err = strconv.Atoi(secPart)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("invalid second %q: %w", secPart, err)
-		}
-	}
-
-	actualLocal := actual.In(croatiaLoc)
-	base := time.Date(actualLocal.Year(), actualLocal.Month(), actualLocal.Day(), hour, minute, second, 0, croatiaLoc)
-	candidates := []time.Time{base.Add(-24 * time.Hour), base, base.Add(24 * time.Hour)}
-	best := candidates[0]
-	bestAbs := absDuration(actual.Sub(best))
-
-	for _, candidate := range candidates[1:] {
-		candidateAbs := absDuration(actual.Sub(candidate))
-		if candidateAbs < bestAbs {
-			best = candidate
-			bestAbs = candidateAbs
-		}
-	}
-
-	return best, nil
-}
-
-func absDuration(value time.Duration) time.Duration {
-	if value < 0 {
-		return -value
-	}
-	return value
-}
-
 func intPtrToInt64Ptr(value *int) *int64 {
 	if value == nil {
 		return nil
 	}
 	v := int64(*value)
 	return &v
-}
-
-func loadDotEnv(path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("open %s: %w", path, err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		keyValue := strings.SplitN(line, "=", 2)
-		if len(keyValue) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(keyValue[0])
-		value := strings.TrimSpace(keyValue[1])
-		value = strings.Trim(value, `"'`)
-		if key == "" || value == "" {
-			continue
-		}
-
-		if _, exists := os.LookupEnv(key); !exists {
-			if err := os.Setenv(key, value); err != nil {
-				return fmt.Errorf("set %s from %s: %w", key, path, err)
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scan %s: %w", path, err)
-	}
-
-	return nil
-}
-
-func getenv(key, fallback string) string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return fallback
-	}
-	return value
-}
-
-func splitCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	brokers := make([]string, 0, len(parts))
-	for _, part := range parts {
-		broker := strings.TrimSpace(part)
-		if broker != "" {
-			brokers = append(brokers, broker)
-		}
-	}
-	if len(brokers) == 0 {
-		return []string{defaultBrokers}
-	}
-	return brokers
 }

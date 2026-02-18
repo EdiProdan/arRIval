@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"strings"
 	"time"
 
+	"github.com/EdiProdan/arRIval/internal/envutil"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -18,8 +17,8 @@ const (
 )
 
 func main() {
-	brokers := splitCSV(getenv("ARRIVAL_KAFKA_BROKERS", defaultBrokers))
-	topic := getenv("ARRIVAL_KAFKA_TOPIC", defaultTopic)
+	brokers := envutil.CSVEnv("ARRIVAL_KAFKA_BROKERS", defaultBrokers)
+	topic := envutil.StringEnv("ARRIVAL_KAFKA_TOPIC", defaultTopic)
 	messageID := fmt.Sprintf("step0-%d", time.Now().UTC().UnixNano())
 
 	producer, err := kgo.NewClient(
@@ -92,27 +91,4 @@ func main() {
 			return
 		}
 	}
-}
-
-func getenv(key, fallback string) string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return fallback
-	}
-	return value
-}
-
-func splitCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	brokers := make([]string, 0, len(parts))
-	for _, part := range parts {
-		broker := strings.TrimSpace(part)
-		if broker != "" {
-			brokers = append(brokers, broker)
-		}
-	}
-	if len(brokers) == 0 {
-		return []string{defaultBrokers}
-	}
-	return brokers
 }
