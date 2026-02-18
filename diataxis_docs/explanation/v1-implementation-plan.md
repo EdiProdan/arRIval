@@ -70,6 +70,8 @@ This plan is the high-level implementation sequence after MVP. Each phase is int
 - Reconnect and stale-data states are handled visibly.
 - MVP UX works against the local full stack.
 
+**Status:** In Progress
+
 ## Phase 5 — Low-cost always-on AWS deployment
 
 **Goal**: run the stack continuously in a budget-friendly cloud setup.
