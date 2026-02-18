@@ -475,3 +475,6 @@ __marimo__/
 eda/data_raw/
 
 data/
+web/realtime-ui/node_modules
+
+web/realtime-ui/.playwright-browsers

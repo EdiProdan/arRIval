@@ -14,6 +14,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Frontend install
+        working-directory: web/realtime-ui
+        run: npm install
+
+      - name: Frontend build
+        working-directory: web/realtime-ui
+        run: npm run build
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:

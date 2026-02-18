@@ -33,6 +33,7 @@ Observability:
 
 Realtime API:
 
+- UI: <http://localhost:8080/>
 - Snapshot: <http://localhost:8080/v1/snapshot>
 - Health: <http://localhost:8080/healthz>
 - Readiness: <http://localhost:8080/readyz>

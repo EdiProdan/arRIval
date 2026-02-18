@@ -52,6 +52,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/readyz", s.handleReadyz)
 	mux.HandleFunc("/v1/snapshot", s.handleSnapshot)
 	mux.HandleFunc("/v1/ws", s.handleWS)
+	mux.Handle("/", newUIHandler())
 	return mux
 }
 

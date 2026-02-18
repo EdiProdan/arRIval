@@ -10,3 +10,4 @@ eda
 *.csv
 *.parquet
 .tmp*
+web/realtime-ui/node_modules

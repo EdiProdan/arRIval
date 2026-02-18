@@ -48,6 +48,7 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
    - delay topic: `docker compose exec redpanda rpk topic consume bus-delays -n 1`
 
 5. Verify realtime API:
+   - UI: `http://localhost:8080/`
    - snapshot: `curl http://localhost:8080/v1/snapshot`
    - health: `curl http://localhost:8080/healthz`
    - readiness: `curl http://localhost:8080/readyz`
@@ -75,12 +76,24 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 
 If running binaries directly with `go run`, set `ARRIVAL_KAFKA_BROKERS=localhost:19092` and start only Redpanda with `docker compose up -d redpanda`.
 
+## Realtime UI development
+
+```bash
+cd web/realtime-ui
+npm install
+npm run dev
+```
+
+Frontend checks:
+- production build: `npm run build`
+
 ## Key folders
 
 - `cmd/ingester` - polls `/autobusi`, publishes raw snapshots
 - `cmd/processor` - writes Bronze/Silver and publishes delay events
 - `cmd/aggregator` - writes Gold route-hour aggregates
 - `cmd/realtime` - serves snapshot + websocket realtime updates
+- `web/realtime-ui` - React/Vite realtime SPA (served by `cmd/realtime` at `/`)
 - `cmd/staticsync` - one-shot static data sync
 - `deploy/prometheus` - scrape configuration
 - `deploy/grafana` - provisioning and dashboard JSON

@@ -230,7 +230,7 @@ Behavior:
 ### 5.9 `cmd/realtime`
 
 Purpose:
-- Consume live/delay topics and expose public read-only realtime APIs.
+- Consume live/delay topics and expose public read-only realtime APIs + UI.
 
 Behavior:
 - Loads `.env` if present
@@ -246,10 +246,12 @@ Behavior:
   - positions TTL default `5m`
   - delays TTL default `90m`
 - Exposes HTTP API:
+  - `GET /` (serves realtime UI)
   - `GET /healthz`
   - `GET /readyz`
   - `GET /v1/snapshot`
   - `GET /v1/ws` (websocket)
+  - `GET /assets/*` (UI static assets when available)
 - Broadcasts websocket envelopes:
   - `positions_batch`
   - `delay_update`
@@ -386,6 +388,8 @@ Additional realtime variables:
   - Default: `arrival-realtime`
 - `ARRIVAL_REALTIME_HTTP_ADDR`
   - Default: `:8080`
+- `ARRIVAL_REALTIME_UI_DIST_DIR`
+  - Default: `web/realtime-ui/dist`
 - `ARRIVAL_REALTIME_POSITIONS_TTL`
   - Default: `5m`
 - `ARRIVAL_REALTIME_DELAYS_TTL`
@@ -424,6 +428,7 @@ Flow:
 7. processor publishes delay events to topic `bus-delays` (or configured delay topic)
 8. `cmd/aggregator` consumes delay events and writes route-hour Gold aggregates
 9. `cmd/realtime` consumes both topics and serves snapshot + websocket updates from in-memory latest state
+10. Browser UI (served from `cmd/realtime`) loads `/v1/snapshot`, then consumes `/v1/ws` updates
 
 ### 8.2 Static Reference Data Flow
 
@@ -508,6 +513,7 @@ Typical current sequence:
 - `cmd/processor/main.go`
 - `cmd/aggregator/main.go`
 - `cmd/realtime/main.go`
+- `web/realtime-ui/*`
 - `cmd/roundtrip/main.go`
 - `cmd/staticsync/main.go`
 - `cmd/staticloader/main.go`
@@ -522,5 +528,6 @@ Typical current sequence:
 - `internal/realtime/store.go`
 - `internal/realtime/hub.go`
 - `internal/realtime/server.go`
+- `internal/realtime/ui.go`
 - `internal/realtime/ws.go`
 - `internal/contracts/realtime.go`
