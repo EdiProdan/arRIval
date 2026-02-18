@@ -39,6 +39,7 @@ The structure follows the Diátaxis framework:
 - [`explanation/architecture-overview.md`](explanation/architecture-overview.md)
 - [`explanation/design-decisions.md`](explanation/design-decisions.md)
 - [`explanation/mvp-implementation-history.md`](explanation/mvp-implementation-history.md)
+- [`explanation/v1-implementation-plan.md`](explanation/v1-implementation-plan.md)
 - [`explanation/architecture-simplified.mmd`](explanation/architecture-simplified.mmd)
 
 ## Documentation maintenance

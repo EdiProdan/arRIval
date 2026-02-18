@@ -43,13 +43,19 @@ type TimetableStopRow struct {
 	Naziv                string   `json:"Naziv"`
 }
 
+type stationLineKey struct {
+	StanicaID  int
+	BrojLinije string
+}
+
 type Store struct {
-	Stations           []Station
-	LinePaths          []LinePathRow
-	TimetableStops     []TimetableStopRow
-	StationsByID       map[int]Station
-	LinePathsByLinVar  map[string][]LinePathRow
-	TimetableByPolazak map[string][]TimetableStopRow
+	Stations              []Station
+	LinePaths             []LinePathRow
+	TimetableStops        []TimetableStopRow
+	StationsByID          map[int]Station
+	LinePathsByLinVar      map[string][]LinePathRow
+	TimetableByPolazak    map[string][]TimetableStopRow
+	TimetableByStationLine map[stationLineKey][]TimetableStopRow
 }
 
 func LoadFromDir(dir string) (*Store, error) {
@@ -73,12 +79,13 @@ func LoadFromDir(dir string) (*Store, error) {
 	}
 
 	store := &Store{
-		Stations:           stations,
-		LinePaths:          linePaths,
-		TimetableStops:     timetableStops,
-		StationsByID:       make(map[int]Station, len(stations)),
-		LinePathsByLinVar:  make(map[string][]LinePathRow),
-		TimetableByPolazak: make(map[string][]TimetableStopRow),
+		Stations:              stations,
+		LinePaths:             linePaths,
+		TimetableStops:        timetableStops,
+		StationsByID:          make(map[int]Station, len(stations)),
+		LinePathsByLinVar:      make(map[string][]LinePathRow),
+		TimetableByPolazak:    make(map[string][]TimetableStopRow),
+		TimetableByStationLine: make(map[stationLineKey][]TimetableStopRow),
 	}
 
 	for _, station := range stations {
@@ -91,6 +98,8 @@ func LoadFromDir(dir string) (*Store, error) {
 
 	for _, row := range timetableStops {
 		store.TimetableByPolazak[row.PolazakID] = append(store.TimetableByPolazak[row.PolazakID], row)
+		slKey := stationLineKey{StanicaID: row.StanicaID, BrojLinije: row.BrojLinije}
+		store.TimetableByStationLine[slKey] = append(store.TimetableByStationLine[slKey], row)
 	}
 
 	return store, nil
@@ -107,6 +116,10 @@ func (s *Store) StopsByLineVariant(linVarID string) []LinePathRow {
 
 func (s *Store) DeparturesByPolazakID(polazakID string) []TimetableStopRow {
 	return s.TimetableByPolazak[polazakID]
+}
+
+func (s *Store) DeparturesByStationLine(stationID int, brojLinije string) []TimetableStopRow {
+	return s.TimetableByStationLine[stationLineKey{StanicaID: stationID, BrojLinije: brojLinije}]
 }
 
 func readJSONFile(path string, target any) error {

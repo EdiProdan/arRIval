@@ -35,7 +35,7 @@ const (
 	defaultStaticDir     = "data"
 	defaultMetricsAddr   = ":9102"
 	stationMatchMeters   = 100.0
-	scheduleWindow       = 5 * time.Minute
+	scheduleWindow       = 15 * time.Minute
 	earthRadiusMeters    = 6371000.0
 )
 
@@ -454,10 +454,17 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 		return silverDelayRow{}, delayEvent{}, false, "no_station_within_100m"
 	}
 
-	polazakID := strconv.Itoa(*bus.VoznjaBusID)
-	stops := store.DeparturesByPolazakID(polazakID)
-	if len(stops) == 0 {
-		return silverDelayRow{}, delayEvent{}, false, "no_schedule_for_polazak"
+	// Use voznjaBusId to determine the bus's line number.
+	tripStops := store.DeparturesByPolazakID(strconv.Itoa(*bus.VoznjaBusID))
+	if len(tripStops) == 0 {
+		return silverDelayRow{}, delayEvent{}, false, "no_line_for_polazak"
+	}
+	brojLinije := tripStops[0].BrojLinije
+
+	// Match against ALL departures at this station for this line.
+	lineStops := store.DeparturesByStationLine(station.StanicaID, brojLinije)
+	if len(lineStops) == 0 {
+		return silverDelayRow{}, delayEvent{}, false, "no_schedule_for_station_line"
 	}
 
 	actual := ingestedAt.UTC()
@@ -468,11 +475,7 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 		matched       bool
 	)
 
-	for _, stop := range stops {
-		if stop.StanicaID != station.StanicaID {
-			continue
-		}
-
+	for _, stop := range lineStops {
 		scheduled, parseErr := parseScheduleTimeLocalAligned(stop.Polazak, actual)
 		if parseErr != nil {
 			continue
@@ -491,15 +494,17 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 	}
 
 	if !matched {
-		return silverDelayRow{}, delayEvent{}, false, "no_schedule_within_5m"
+		return silverDelayRow{}, delayEvent{}, false, "no_schedule_within_window"
 	}
 
-	delaySeconds := int64(actual.Sub(bestScheduled).Seconds())
+	scheduledUTC := bestScheduled.UTC()
+	actualUTC := actual.UTC()
+	delaySeconds := int64(actualUTC.Sub(scheduledUTC).Seconds())
 	gbr := intPtrToInt64Ptr(bus.GBR)
 	resultRow := silverDelayRow{
 		IngestedAt:     bronzeRow.IngestedAt,
 		IngestedDate:   bronzeRow.IngestedDate,
-		PolazakID:      polazakID,
+		PolazakID:      bestStop.PolazakID,
 		VoznjaBusID:    int64(*bus.VoznjaBusID),
 		GBR:            gbr,
 		StationID:      int64(station.StanicaID),
@@ -507,8 +512,8 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 		DistanceM:      stationDistanceM,
 		LinVarID:       bestStop.LinVarID,
 		BrojLinije:     bestStop.BrojLinije,
-		ScheduledTime:  bestScheduled.Format(time.RFC3339Nano),
-		ActualTime:     actual.Format(time.RFC3339Nano),
+		ScheduledTime:  scheduledUTC.Format(time.RFC3339Nano),
+		ActualTime:     actualUTC.Format(time.RFC3339Nano),
 		DelaySeconds:   delaySeconds,
 		KafkaTopic:     bronzeRow.KafkaTopic,
 		KafkaPartition: bronzeRow.KafkaPartition,
@@ -516,7 +521,7 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 	}
 
 	event := delayEvent{
-		PolazakID:     polazakID,
+		PolazakID:     bestStop.PolazakID,
 		VoznjaBusID:   int64(*bus.VoznjaBusID),
 		GBR:           gbr,
 		StationID:     int64(station.StanicaID),
@@ -524,8 +529,8 @@ func buildDelay(ingestedAt time.Time, bus autotrolej.LiveBus, bronzeRow bronzePo
 		DistanceM:     stationDistanceM,
 		LinVarID:      bestStop.LinVarID,
 		BrojLinije:    bestStop.BrojLinije,
-		ScheduledTime: bestScheduled.Format(time.RFC3339Nano),
-		ActualTime:    actual.Format(time.RFC3339Nano),
+		ScheduledTime: scheduledUTC.Format(time.RFC3339Nano),
+		ActualTime:    actualUTC.Format(time.RFC3339Nano),
 		DelaySeconds:  delaySeconds,
 	}
 
