@@ -2,6 +2,16 @@
 
 Developer workspace for ingesting and analyzing Rijeka AUTOTROLEJ transit data.
 
+## Documentation
+
+Canonical docs follow the Diátaxis structure in `diataxis_docs/`.
+
+- Start page: `diataxis_docs/README.md`
+- Tutorial: `diataxis_docs/tutorials/first-local-run.md`
+- How-to guides: `diataxis_docs/how-to/`
+- Reference: `diataxis_docs/reference/`
+- Explanation: `diataxis_docs/explanation/`
+
 ## Prerequisites
 
 - Docker + Docker Compose

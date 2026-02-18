@@ -1,0 +1,82 @@
+graph TB
+    subgraph "Data Sources"
+        API1["AUTOTROLEJ /autobusi<br/>(live positions)"]
+        ODS1["OpenData ATlinije.json"]
+        ODS2["OpenData ATstanice.json"]
+        ODS3["OpenData ATvoznired.json"]
+    end
+
+    subgraph "Ingestion Layer"
+        Ingester[Ingester Service<br/>Go - polls every 30s]
+        StaticSync[StaticSync CLI<br/>Go - one-shot static downloader]
+        APIClient[APIClient CLI<br/>Go - one-shot live snapshot]
+    end
+
+    subgraph "Message Broker"
+        T1["Redpanda Topic:<br/>bus-positions-raw"]
+        T2["Redpanda Topic:<br/>bus-delays"]
+    end
+
+    subgraph "Processing Layer"
+        Processor[Processor Service<br/>Go - Bronze+Silver + delay events]
+        Aggregator[Aggregator Service<br/>Go - hourly route stats]
+    end
+
+    subgraph "Storage"
+        Bronze["🥉 Bronze<br/>data/bronze/YYYY-MM-DD/<br/>positions.parquet"]
+        Silver["🥈 Silver<br/>data/silver/YYYY-MM-DD/<br/>delays.parquet"]
+        Gold["🥇 Gold<br/>data/gold/YYYY-MM-DD/<br/>stats.parquet"]
+        StaticFiles["Static JSON Files<br/>data/linije.json<br/>data/stanice.json<br/>data/voznired_dnevni.json"]
+    end
+
+    subgraph "Validation and Loader CLIs"
+        Roundtrip[Roundtrip CLI<br/>Go - produce/consume smoke test]
+        StaticLoader[StaticLoader CLI<br/>Go - loads static data + counts]
+    end
+
+    subgraph "Observability"
+        Prom[Prometheus<br/>metrics scraping]
+        Graf[Grafana<br/>provisioned dashboard]
+    end
+
+    %% Data flow
+    API1 -->|HTTP poll| Ingester
+    API1 -->|one-shot fetch| APIClient
+
+    ODS1 -->|download| StaticSync
+    ODS2 -->|download| StaticSync
+    ODS3 -->|download| StaticSync
+
+    StaticSync -->|write JSON| StaticFiles
+    StaticFiles -->|load and index| StaticLoader
+
+    Ingester -->|publish raw JSON| T1
+    T1 -->|consume| Processor
+    Processor -->|write raw rows| Bronze
+    Processor -->|write delay rows| Silver
+    Processor -->|publish delay events| T2
+    T2 -->|consume delay events| Aggregator
+    Aggregator -->|write hourly route stats| Gold
+
+    Ingester -.->|expose metrics| Prom
+    Processor -.->|expose metrics| Prom
+    Aggregator -.->|expose metrics| Prom
+    Prom -.->|query| Graf
+
+    Roundtrip -->|produce test message| T1
+    T1 -->|consume test message| Roundtrip
+
+    %% Styling
+    classDef storage fill:#e1f5ff,stroke:#0366d6
+    classDef service fill:#fff5e1,stroke:#d97706
+    classDef broker fill:#f0e6ff,stroke:#8b5cf6
+    classDef utility fill:#f5f5f5,stroke:#6b7280
+    classDef source fill:#eefaf3,stroke:#059669
+    classDef observability fill:#e6ffe6,stroke:#059669
+
+    class Bronze,Silver,Gold,StaticFiles storage
+    class Ingester,Processor,Aggregator service
+    class T1,T2 broker
+    class StaticSync,APIClient,Roundtrip,StaticLoader utility
+    class API1,ODS1,ODS2,ODS3 source
+    class Prom,Graf observability

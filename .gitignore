@@ -200,6 +200,11 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# generated EDA exports (not canonical docs)
+eda/*.html
+docs/*_eda.html
+diataxis_docs/reference/eda/*.html
+
 # mypy
 .mypy_cache/
 .dmypy.json
