@@ -4,6 +4,11 @@ Goal: get the full data pipeline running locally and verify end-to-end output.
 
 This tutorial is for first-time contributors. Follow it in order.
 
+## Phase 3 transition note
+
+As of **February 21, 2026**, `processor` emits delay events only to V2 topics and writes split V2 Silver files.  
+`aggregator` and `realtime` delay consumers still use legacy `bus-delays` until Phase 4 cutover.
+
 ## Prerequisites
 
 - Docker + Docker Compose installed
@@ -44,7 +49,8 @@ What you should observe:
 
 ```bash
 docker compose exec redpanda rpk topic consume bus-positions-raw -n 1
-docker compose exec redpanda rpk topic consume bus-delays -n 1
+docker compose exec redpanda rpk topic consume bus-delay-observed-v2 -n 1
+docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1
 ```
 
 ## 5) Verify Parquet outputs
@@ -52,7 +58,8 @@ docker compose exec redpanda rpk topic consume bus-delays -n 1
 Check UTC date partitions in `data/`:
 
 - `data/bronze/YYYY-MM-DD/positions.parquet`
-- `data/silver/YYYY-MM-DD/delays.parquet`
+- `data/silver/YYYY-MM-DD/observed_delays_v2.parquet`
+- `data/silver/YYYY-MM-DD/predicted_delays_v2.parquet`
 - `data/gold/YYYY-MM-DD/stats.parquet`
 
 ## 6) Verify observability

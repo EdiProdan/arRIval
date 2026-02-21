@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -18,23 +19,33 @@ import (
 	"github.com/EdiProdan/arRIval/internal/processorlogic"
 	"github.com/EdiProdan/arRIval/internal/staticdata"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/parquet"
 	"github.com/xitongsys/parquet-go/writer"
 )
 
 const (
-	defaultBrokers       = "localhost:19092"
-	defaultInputTopic    = "bus-positions-raw"
-	defaultOutputTopic   = "bus-delays"
-	defaultConsumerGroup = "arrival-processor-bronze"
-	defaultBronzeDir     = "data/bronze"
-	defaultSilverDir     = "data/silver"
-	defaultStaticDir     = "data"
-	defaultMetricsAddr   = ":9102"
-	stationMatchMeters   = 100.0
-	scheduleWindow       = 15 * time.Minute
+	defaultBrokers              = "localhost:19092"
+	defaultInputTopic           = "bus-positions-raw"
+	defaultObservedOutputTopic  = contracts.TopicBusDelayObservedV2
+	defaultPredictedOutputTopic = contracts.TopicBusDelayPredictedV2
+	defaultConsumerGroup        = "arrival-processor-bronze"
+	defaultBronzeDir            = "data/bronze"
+	defaultSilverDir            = "data/silver"
+	defaultStaticDir            = "data"
+	defaultMetricsAddr          = ":9102"
+	stationMatchMeters          = 100.0
+)
+
+const (
+	observedSilverFilename  = "observed_delays_v2.parquet"
+	predictedSilverFilename = "predicted_delays_v2.parquet"
+	createTopicTimeout      = 15 * time.Second
+	createTopicPartitions   = 1
+	createTopicReplicas     = 1
 )
 
 var serviceLocation = func() *time.Location {
@@ -46,9 +57,13 @@ var serviceLocation = func() *time.Location {
 }()
 
 type processorMetrics struct {
-	messagesProcessed prometheus.Counter
-	processingLagSec  prometheus.Histogram
-	delaySeconds      prometheus.Histogram
+	messagesProcessed     prometheus.Counter
+	processingLagSec      prometheus.Histogram
+	observedDelaySeconds  prometheus.Histogram
+	predictedDelaySeconds prometheus.Histogram
+	observedPublished     prometheus.Counter
+	predictedPublished    prometheus.Counter
+	trackerSkips          *prometheus.CounterVec
 }
 
 type bronzePositionRow struct {
@@ -74,31 +89,83 @@ type bronzeDailyWriter struct {
 	rowsWritten int64
 }
 
-type silverDelayRow struct {
+type silverObservedDelayV2Row struct {
 	IngestedAt     string  `parquet:"name=ingested_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	IngestedDate   string  `parquet:"name=ingested_date, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	PolazakID      string  `parquet:"name=polazak_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	TripID         string  `parquet:"name=trip_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	VoznjaBusID    int64   `parquet:"name=voznja_bus_id, type=INT64"`
 	GBR            *int64  `parquet:"name=gbr, type=INT64, repetitiontype=OPTIONAL"`
-	StationID      int64   `parquet:"name=station_id, type=INT64"`
-	StationName    string  `parquet:"name=station_name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	DistanceM      float64 `parquet:"name=distance_m, type=DOUBLE"`
 	LinVarID       string  `parquet:"name=lin_var_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	BrojLinije     string  `parquet:"name=broj_linije, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	StationID      int64   `parquet:"name=station_id, type=INT64"`
+	StationName    string  `parquet:"name=station_name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	StationSeq     int64   `parquet:"name=station_seq, type=INT64"`
 	ScheduledTime  string  `parquet:"name=scheduled_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	ActualTime     string  `parquet:"name=actual_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	ObservedTime   string  `parquet:"name=observed_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	DelaySeconds   int64   `parquet:"name=delay_seconds, type=INT64"`
+	DistanceM      float64 `parquet:"name=distance_m, type=DOUBLE"`
+	TrackerVersion string  `parquet:"name=tracker_version, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	KafkaTopic     string  `parquet:"name=kafka_topic, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	KafkaPartition int32   `parquet:"name=kafka_partition, type=INT32"`
 	KafkaOffset    int64   `parquet:"name=kafka_offset, type=INT64"`
 }
 
-type silverDailyWriter struct {
+type silverPredictedDelayV2Row struct {
+	IngestedAt            string `parquet:"name=ingested_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	IngestedDate          string `parquet:"name=ingested_date, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	TripID                string `parquet:"name=trip_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	VoznjaBusID           int64  `parquet:"name=voznja_bus_id, type=INT64"`
+	LinVarID              string `parquet:"name=lin_var_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	BrojLinije            string `parquet:"name=broj_linije, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	StationID             int64  `parquet:"name=station_id, type=INT64"`
+	StationName           string `parquet:"name=station_name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	StationSeq            int64  `parquet:"name=station_seq, type=INT64"`
+	ScheduledTime         string `parquet:"name=scheduled_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	PredictedTime         string `parquet:"name=predicted_time, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	PredictedDelaySeconds int64  `parquet:"name=predicted_delay_seconds, type=INT64"`
+	GeneratedAt           string `parquet:"name=generated_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	TrackerVersion        string `parquet:"name=tracker_version, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	KafkaTopic            string `parquet:"name=kafka_topic, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	KafkaPartition        int32  `parquet:"name=kafka_partition, type=INT32"`
+	KafkaOffset           int64  `parquet:"name=kafka_offset, type=INT64"`
+}
+
+type silverObservedDailyWriter struct {
 	baseDir     string
 	currentDate string
 	currentPath string
 	pw          *writer.ParquetWriter
 	rowsWritten int64
+}
+
+type silverPredictedDailyWriter struct {
+	baseDir     string
+	currentDate string
+	currentPath string
+	pw          *writer.ParquetWriter
+	rowsWritten int64
+}
+
+type bronzeWriter interface {
+	Write(row bronzePositionRow) error
+}
+
+type observedWriter interface {
+	Write(row silverObservedDelayV2Row) error
+}
+
+type predictedWriter interface {
+	Write(row silverPredictedDelayV2Row) error
+}
+
+type tracker interface {
+	Track(input processorlogic.V2TrackInput) processorlogic.V2TrackOutput
+}
+
+type publishFunc func(ctx context.Context, record *kgo.Record) error
+
+var requestCreateTopics = func(ctx context.Context, client *kgo.Client, req *kmsg.CreateTopicsRequest) (*kmsg.CreateTopicsResponse, error) {
+	return req.RequestWith(ctx, client)
 }
 
 func main() {
@@ -111,7 +178,8 @@ func main() {
 
 	brokers := envutil.CSVEnv("ARRIVAL_KAFKA_BROKERS", defaultBrokers)
 	inputTopic := envutil.StringEnv("ARRIVAL_KAFKA_TOPIC", defaultInputTopic)
-	outputTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_TOPIC", defaultOutputTopic)
+	observedTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_OBSERVED_TOPIC", defaultObservedOutputTopic)
+	predictedTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_PREDICTED_TOPIC", defaultPredictedOutputTopic)
 	consumerGroup := envutil.StringEnv("ARRIVAL_PROCESSOR_GROUP", defaultConsumerGroup)
 	bronzeDir := envutil.StringEnv("ARRIVAL_BRONZE_DIR", defaultBronzeDir)
 	silverDir := envutil.StringEnv("ARRIVAL_SILVER_DIR", defaultSilverDir)
@@ -125,6 +193,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("load static data: %v", err)
 	}
+
+	statefulTracker := processorlogic.NewV2Tracker(store, processorlogic.V2TrackerConfig{
+		StationMatchMeters: stationMatchMeters,
+		ServiceLocation:    serviceLocation,
+	})
 
 	consumer, err := kgo.NewClient(
 		kgo.SeedBrokers(brokers...),
@@ -142,6 +215,17 @@ func main() {
 	}
 	defer producer.Close()
 
+	createCtx, cancelCreate := context.WithTimeout(ctx, createTopicTimeout)
+	if err := ensureTopics(createCtx, producer, observedTopic, predictedTopic); err != nil {
+		cancelCreate()
+		log.Fatalf("ensure delay topics: %v", err)
+	}
+	cancelCreate()
+
+	publish := func(ctx context.Context, record *kgo.Record) error {
+		return producer.ProduceSync(ctx, record).FirstErr()
+	}
+
 	bw := &bronzeDailyWriter{baseDir: bronzeDir}
 	defer func() {
 		if err := bw.Close(); err != nil {
@@ -149,14 +233,29 @@ func main() {
 		}
 	}()
 
-	sw := &silverDailyWriter{baseDir: silverDir}
+	ow := &silverObservedDailyWriter{baseDir: silverDir}
 	defer func() {
-		if err := sw.Close(); err != nil {
-			log.Printf("close silver writer: %v", err)
+		if err := ow.Close(); err != nil {
+			log.Printf("close observed silver writer: %v", err)
 		}
 	}()
 
-	log.Printf("processor started: input_topic=%s output_topic=%s group=%s bronze_dir=%s silver_dir=%s", inputTopic, outputTopic, consumerGroup, bronzeDir, silverDir)
+	pw := &silverPredictedDailyWriter{baseDir: silverDir}
+	defer func() {
+		if err := pw.Close(); err != nil {
+			log.Printf("close predicted silver writer: %v", err)
+		}
+	}()
+
+	log.Printf(
+		"processor started: input_topic=%s observed_topic=%s predicted_topic=%s group=%s bronze_dir=%s silver_dir=%s",
+		inputTopic,
+		observedTopic,
+		predictedTopic,
+		consumerGroup,
+		bronzeDir,
+		silverDir,
+	)
 
 	var messageCount int64
 	var publishedCount int64
@@ -176,10 +275,10 @@ func main() {
 		var commitRecords []*kgo.Record
 		fetches.EachRecord(func(rec *kgo.Record) {
 			if !rec.Timestamp.IsZero() {
-				collector.processingLagSec.Observe(time.Since(rec.Timestamp).Seconds())
+				collector.processingLagSec.Observe(time.Since(rec.Timestamp.UTC()).Seconds())
 			}
 
-			commit, published, writeErr := processRecord(ctx, bw, sw, producer, outputTopic, store, collector, rec)
+			commit, published, writeErr := processRecord(ctx, bw, ow, pw, statefulTracker, publish, observedTopic, predictedTopic, collector, rec)
 			if writeErr != nil {
 				log.Printf("status=error stage=process partition=%d offset=%d err=%v", rec.Partition, rec.Offset, writeErr)
 				return
@@ -198,10 +297,28 @@ func main() {
 		}
 	}
 
-	log.Printf("processor stopped: messages=%d bronze_rows=%d silver_rows=%d published=%d", messageCount, bw.rowsWritten, sw.rowsWritten, publishedCount)
+	log.Printf(
+		"processor stopped: messages=%d bronze_rows=%d observed_silver_rows=%d predicted_silver_rows=%d published=%d",
+		messageCount,
+		bw.rowsWritten,
+		ow.rowsWritten,
+		pw.rowsWritten,
+		publishedCount,
+	)
 }
 
-func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWriter, producer *kgo.Client, outputTopic string, store *staticdata.Store, collector processorMetrics, rec *kgo.Record) (bool, int64, error) {
+func processRecord(
+	ctx context.Context,
+	bw bronzeWriter,
+	ow observedWriter,
+	pw predictedWriter,
+	track tracker,
+	publish publishFunc,
+	observedTopic string,
+	predictedTopic string,
+	collector processorMetrics,
+	rec *kgo.Record,
+) (bool, int64, error) {
 	var payload autotrolej.AutobusiResponse
 	if err := json.Unmarshal(rec.Value, &payload); err != nil {
 		log.Printf("status=error stage=unmarshal partition=%d offset=%d err=%v", rec.Partition, rec.Offset, err)
@@ -209,11 +326,11 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 	}
 
 	ingestedAt := time.Now().UTC()
-	matchCfg := processorlogic.Config{
-		StationMatchMeters: stationMatchMeters,
-		ScheduleWindow:     scheduleWindow,
-		ServiceLocation:    serviceLocation,
+	observedAt := rec.Timestamp.UTC()
+	if observedAt.IsZero() {
+		observedAt = ingestedAt
 	}
+
 	var published int64
 	for _, bus := range payload.Res {
 		row := bronzePositionRow{
@@ -230,71 +347,124 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 			VoznjaID:       intPtrToInt64Ptr(bus.VoznjaID),
 			VoznjaBusID:    intPtrToInt64Ptr(bus.VoznjaBusID),
 		}
-
 		if err := bw.Write(row); err != nil {
 			return false, published, err
 		}
 
-		match, ok, reason := processorlogic.BuildDelay(processorlogic.MatchInput{
-			IngestedAt:     ingestedAt,
+		out := track.Track(processorlogic.V2TrackInput{
+			ObservedAt:     observedAt,
 			KafkaTopic:     rec.Topic,
 			KafkaPartition: rec.Partition,
 			KafkaOffset:    rec.Offset,
 			Bus:            bus,
-		}, store, matchCfg)
-		if !ok {
-			log.Printf("status=skip stage=delay_match reason=%s partition=%d offset=%d voznja_bus_id=%v", reason, rec.Partition, rec.Offset, bus.VoznjaBusID)
+		})
+		if out.SkipReason != processorlogic.V2SkipReasonNone {
+			reason := string(out.SkipReason)
+			collector.trackerSkips.WithLabelValues(reason).Inc()
+			log.Printf(
+				"status=skip stage=v2_track reason=%s partition=%d offset=%d voznja_bus_id=%v",
+				reason,
+				rec.Partition,
+				rec.Offset,
+				bus.VoznjaBusID,
+			)
 			continue
 		}
 
-		silverRow := silverDelayRow{
-			IngestedAt:     row.IngestedAt,
-			IngestedDate:   row.IngestedDate,
-			PolazakID:      match.PolazakID,
-			VoznjaBusID:    match.VoznjaBusID,
-			GBR:            match.GBR,
-			StationID:      match.StationID,
-			StationName:    match.StationName,
-			DistanceM:      match.DistanceM,
-			LinVarID:       match.LinVarID,
-			BrojLinije:     match.BrojLinije,
-			ScheduledTime:  match.ScheduledTime.Format(time.RFC3339Nano),
-			ActualTime:     match.ActualTime.Format(time.RFC3339Nano),
-			DelaySeconds:   match.DelaySeconds,
-			KafkaTopic:     row.KafkaTopic,
-			KafkaPartition: row.KafkaPartition,
-			KafkaOffset:    row.KafkaOffset,
-		}
-		if err := sw.Write(silverRow); err != nil {
-			return false, published, err
+		for _, event := range out.Observed {
+			silverRow := silverObservedDelayV2Row{
+				IngestedAt:     row.IngestedAt,
+				IngestedDate:   row.IngestedDate,
+				TripID:         event.TripID,
+				VoznjaBusID:    event.VoznjaBusID,
+				GBR:            event.GBR,
+				LinVarID:       event.LinVarID,
+				BrojLinije:     event.BrojLinije,
+				StationID:      event.StationID,
+				StationName:    event.StationName,
+				StationSeq:     event.StationSeq,
+				ScheduledTime:  event.ScheduledTime,
+				ObservedTime:   event.ObservedTime,
+				DelaySeconds:   event.DelaySeconds,
+				DistanceM:      event.DistanceM,
+				TrackerVersion: event.TrackerVersion,
+				KafkaTopic:     row.KafkaTopic,
+				KafkaPartition: row.KafkaPartition,
+				KafkaOffset:    row.KafkaOffset,
+			}
+			if err := ow.Write(silverRow); err != nil {
+				return false, published, err
+			}
+
+			payloadBytes, err := json.Marshal(event)
+			if err != nil {
+				return false, published, fmt.Errorf("marshal observed delay v2 event: %w", err)
+			}
+
+			key := fmt.Sprintf("%d:%d:%d:%d", event.VoznjaBusID, event.StationID, rec.Partition, rec.Offset)
+			if err := publish(ctx, &kgo.Record{Topic: observedTopic, Key: []byte(key), Value: payloadBytes}); err != nil {
+				return false, published, fmt.Errorf("publish observed delay v2 event: %w", err)
+			}
+
+			collector.observedDelaySeconds.Observe(float64(event.DelaySeconds))
+			collector.observedPublished.Inc()
+			published++
+			log.Printf(
+				"status=ok stage=delay_observed_publish topic=%s partition=%d offset=%d station_id=%d delay_seconds=%d",
+				observedTopic,
+				rec.Partition,
+				rec.Offset,
+				event.StationID,
+				event.DelaySeconds,
+			)
 		}
 
-		event := contracts.DelayEvent{
-			PolazakID:     match.PolazakID,
-			VoznjaBusID:   match.VoznjaBusID,
-			GBR:           match.GBR,
-			StationID:     match.StationID,
-			StationName:   match.StationName,
-			DistanceM:     match.DistanceM,
-			LinVarID:      match.LinVarID,
-			BrojLinije:    match.BrojLinije,
-			ScheduledTime: match.ScheduledTime.Format(time.RFC3339Nano),
-			ActualTime:    match.ActualTime.Format(time.RFC3339Nano),
-			DelaySeconds:  match.DelaySeconds,
-		}
-		payloadBytes, err := json.Marshal(event)
-		if err != nil {
-			return false, published, fmt.Errorf("marshal delay event: %w", err)
-		}
+		for _, event := range out.Predicted {
+			silverRow := silverPredictedDelayV2Row{
+				IngestedAt:            row.IngestedAt,
+				IngestedDate:          row.IngestedDate,
+				TripID:                event.TripID,
+				VoznjaBusID:           event.VoznjaBusID,
+				LinVarID:              event.LinVarID,
+				BrojLinije:            event.BrojLinije,
+				StationID:             event.StationID,
+				StationName:           event.StationName,
+				StationSeq:            event.StationSeq,
+				ScheduledTime:         event.ScheduledTime,
+				PredictedTime:         event.PredictedTime,
+				PredictedDelaySeconds: event.PredictedDelaySeconds,
+				GeneratedAt:           event.GeneratedAt,
+				TrackerVersion:        event.TrackerVersion,
+				KafkaTopic:            row.KafkaTopic,
+				KafkaPartition:        row.KafkaPartition,
+				KafkaOffset:           row.KafkaOffset,
+			}
+			if err := pw.Write(silverRow); err != nil {
+				return false, published, err
+			}
 
-		key := fmt.Sprintf("%d:%d:%d", event.VoznjaBusID, rec.Partition, rec.Offset)
-		if err := producer.ProduceSync(ctx, &kgo.Record{Topic: outputTopic, Key: []byte(key), Value: payloadBytes}).FirstErr(); err != nil {
-			return false, published, fmt.Errorf("publish delay event: %w", err)
-		}
+			payloadBytes, err := json.Marshal(event)
+			if err != nil {
+				return false, published, fmt.Errorf("marshal predicted delay v2 event: %w", err)
+			}
 
-		collector.delaySeconds.Observe(float64(event.DelaySeconds))
-		published++
-		log.Printf("status=ok stage=delay_publish topic=%s partition=%d offset=%d station_id=%d delay_seconds=%d", outputTopic, rec.Partition, rec.Offset, event.StationID, event.DelaySeconds)
+			key := fmt.Sprintf("%d:%d:%d:%d", event.VoznjaBusID, event.StationID, rec.Partition, rec.Offset)
+			if err := publish(ctx, &kgo.Record{Topic: predictedTopic, Key: []byte(key), Value: payloadBytes}); err != nil {
+				return false, published, fmt.Errorf("publish predicted delay v2 event: %w", err)
+			}
+
+			collector.predictedDelaySeconds.Observe(float64(event.PredictedDelaySeconds))
+			collector.predictedPublished.Inc()
+			published++
+			log.Printf(
+				"status=ok stage=delay_predicted_publish topic=%s partition=%d offset=%d station_id=%d predicted_delay_seconds=%d",
+				predictedTopic,
+				rec.Partition,
+				rec.Offset,
+				event.StationID,
+				event.PredictedDelaySeconds,
+			)
+		}
 	}
 
 	log.Printf(
@@ -306,6 +476,44 @@ func processRecord(ctx context.Context, bw *bronzeDailyWriter, sw *silverDailyWr
 	)
 
 	return true, published, nil
+}
+
+func ensureTopics(ctx context.Context, client *kgo.Client, topics ...string) error {
+	for _, topic := range topics {
+		if err := ensureTopic(ctx, client, topic); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureTopic(ctx context.Context, client *kgo.Client, topic string) error {
+	req := kmsg.NewPtrCreateTopicsRequest()
+	requestTopic := kmsg.NewCreateTopicsRequestTopic()
+	requestTopic.Topic = topic
+	requestTopic.NumPartitions = createTopicPartitions
+	requestTopic.ReplicationFactor = createTopicReplicas
+	req.Topics = append(req.Topics, requestTopic)
+
+	res, err := requestCreateTopics(ctx, client, req)
+	if err != nil {
+		return fmt.Errorf("request create topic %q: %w", topic, err)
+	}
+	if len(res.Topics) != 1 {
+		return fmt.Errorf("create topic %q: expected one topic response, got %d", topic, len(res.Topics))
+	}
+
+	topicRes := res.Topics[0]
+	if err := kerr.ErrorForCode(topicRes.ErrorCode); err != nil {
+		if !errors.Is(err, kerr.TopicAlreadyExists) {
+			return fmt.Errorf("create topic %q: %w", topic, err)
+		}
+		log.Printf("status=ok stage=topic_ensure topic=%s result=already_exists", topic)
+		return nil
+	}
+
+	log.Printf("status=ok stage=topic_ensure topic=%s result=created_or_verified", topic)
+	return nil
 }
 
 func newProcessorMetrics() processorMetrics {
@@ -320,18 +528,51 @@ func newProcessorMetrics() processorMetrics {
 		Buckets: prometheus.DefBuckets,
 	})
 
-	delaySeconds := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:    "arrival_processor_delay_seconds",
-		Help:    "Distribution of computed bus delay values in seconds.",
+	observedDelaySeconds := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "arrival_processor_observed_delay_seconds",
+		Help:    "Distribution of observed V2 bus delay values in seconds.",
 		Buckets: []float64{-1800, -900, -300, -120, -60, -30, 0, 30, 60, 120, 300, 600, 900, 1800, 3600},
 	})
 
-	prometheus.MustRegister(messagesProcessed, processingLagSec, delaySeconds)
+	predictedDelaySeconds := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "arrival_processor_predicted_delay_seconds",
+		Help:    "Distribution of predicted V2 bus delay values in seconds.",
+		Buckets: []float64{-1800, -900, -300, -120, -60, -30, 0, 30, 60, 120, 300, 600, 900, 1800, 3600},
+	})
+
+	observedPublished := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrival_processor_observed_events_published_total",
+		Help: "Total number of observed V2 delay events published.",
+	})
+
+	predictedPublished := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "arrival_processor_predicted_events_published_total",
+		Help: "Total number of predicted V2 delay events published.",
+	})
+
+	trackerSkips := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "arrival_processor_tracker_skips_total",
+		Help: "Total number of V2 tracker skips grouped by skip reason.",
+	}, []string{"reason"})
+
+	prometheus.MustRegister(
+		messagesProcessed,
+		processingLagSec,
+		observedDelaySeconds,
+		predictedDelaySeconds,
+		observedPublished,
+		predictedPublished,
+		trackerSkips,
+	)
 
 	return processorMetrics{
-		messagesProcessed: messagesProcessed,
-		processingLagSec:  processingLagSec,
-		delaySeconds:      delaySeconds,
+		messagesProcessed:     messagesProcessed,
+		processingLagSec:      processingLagSec,
+		observedDelaySeconds:  observedDelaySeconds,
+		predictedDelaySeconds: predictedDelaySeconds,
+		observedPublished:     observedPublished,
+		predictedPublished:    predictedPublished,
+		trackerSkips:          trackerSkips,
 	}
 }
 
@@ -403,20 +644,20 @@ func (bw *bronzeDailyWriter) Close() error {
 	return nil
 }
 
-func (sw *silverDailyWriter) Write(row silverDelayRow) error {
+func (sw *silverObservedDailyWriter) Write(row silverObservedDelayV2Row) error {
 	if err := sw.ensureDate(row.IngestedDate); err != nil {
 		return err
 	}
 
 	if err := sw.pw.Write(row); err != nil {
-		return fmt.Errorf("write silver parquet row: %w", err)
+		return fmt.Errorf("write observed silver parquet row: %w", err)
 	}
 
 	sw.rowsWritten++
 	return nil
 }
 
-func (sw *silverDailyWriter) ensureDate(date string) error {
+func (sw *silverObservedDailyWriter) ensureDate(date string) error {
 	if sw.pw != nil && sw.currentDate == date {
 		return nil
 	}
@@ -427,19 +668,19 @@ func (sw *silverDailyWriter) ensureDate(date string) error {
 
 	dayDir := filepath.Join(sw.baseDir, date)
 	if err := os.MkdirAll(dayDir, 0o755); err != nil {
-		return fmt.Errorf("create silver day dir %s: %w", dayDir, err)
+		return fmt.Errorf("create observed silver day dir %s: %w", dayDir, err)
 	}
 
-	filePath := filepath.Join(dayDir, "delays.parquet")
+	filePath := filepath.Join(dayDir, observedSilverFilename)
 	fw, err := local.NewLocalFileWriter(filePath)
 	if err != nil {
-		return fmt.Errorf("open silver parquet file writer %s: %w", filePath, err)
+		return fmt.Errorf("open observed silver parquet file writer %s: %w", filePath, err)
 	}
 
-	pw, err := writer.NewParquetWriter(fw, new(silverDelayRow), 1)
+	pw, err := writer.NewParquetWriter(fw, new(silverObservedDelayV2Row), 1)
 	if err != nil {
 		_ = fw.Close()
-		return fmt.Errorf("create silver parquet writer %s: %w", filePath, err)
+		return fmt.Errorf("create observed silver parquet writer %s: %w", filePath, err)
 	}
 	pw.CompressionType = parquet.CompressionCodec_SNAPPY
 
@@ -447,20 +688,84 @@ func (sw *silverDailyWriter) ensureDate(date string) error {
 	sw.currentPath = filePath
 	sw.pw = pw
 
-	log.Printf("status=ok stage=silver_writer_open file=%s", filePath)
+	log.Printf("status=ok stage=observed_silver_writer_open file=%s", filePath)
 	return nil
 }
 
-func (sw *silverDailyWriter) Close() error {
+func (sw *silverObservedDailyWriter) Close() error {
 	if sw.pw == nil {
 		return nil
 	}
 
 	if err := sw.pw.WriteStop(); err != nil {
-		return fmt.Errorf("close silver parquet writer %s: %w", sw.currentPath, err)
+		return fmt.Errorf("close observed silver parquet writer %s: %w", sw.currentPath, err)
 	}
 
-	log.Printf("status=ok stage=silver_writer_close file=%s", sw.currentPath)
+	log.Printf("status=ok stage=observed_silver_writer_close file=%s", sw.currentPath)
+	sw.pw = nil
+	sw.currentDate = ""
+	sw.currentPath = ""
+	return nil
+}
+
+func (sw *silverPredictedDailyWriter) Write(row silverPredictedDelayV2Row) error {
+	if err := sw.ensureDate(row.IngestedDate); err != nil {
+		return err
+	}
+
+	if err := sw.pw.Write(row); err != nil {
+		return fmt.Errorf("write predicted silver parquet row: %w", err)
+	}
+
+	sw.rowsWritten++
+	return nil
+}
+
+func (sw *silverPredictedDailyWriter) ensureDate(date string) error {
+	if sw.pw != nil && sw.currentDate == date {
+		return nil
+	}
+
+	if err := sw.Close(); err != nil {
+		return err
+	}
+
+	dayDir := filepath.Join(sw.baseDir, date)
+	if err := os.MkdirAll(dayDir, 0o755); err != nil {
+		return fmt.Errorf("create predicted silver day dir %s: %w", dayDir, err)
+	}
+
+	filePath := filepath.Join(dayDir, predictedSilverFilename)
+	fw, err := local.NewLocalFileWriter(filePath)
+	if err != nil {
+		return fmt.Errorf("open predicted silver parquet file writer %s: %w", filePath, err)
+	}
+
+	pw, err := writer.NewParquetWriter(fw, new(silverPredictedDelayV2Row), 1)
+	if err != nil {
+		_ = fw.Close()
+		return fmt.Errorf("create predicted silver parquet writer %s: %w", filePath, err)
+	}
+	pw.CompressionType = parquet.CompressionCodec_SNAPPY
+
+	sw.currentDate = date
+	sw.currentPath = filePath
+	sw.pw = pw
+
+	log.Printf("status=ok stage=predicted_silver_writer_open file=%s", filePath)
+	return nil
+}
+
+func (sw *silverPredictedDailyWriter) Close() error {
+	if sw.pw == nil {
+		return nil
+	}
+
+	if err := sw.pw.WriteStop(); err != nil {
+		return fmt.Errorf("close predicted silver parquet writer %s: %w", sw.currentPath, err)
+	}
+
+	log.Printf("status=ok stage=predicted_silver_writer_close file=%s", sw.currentPath)
 	sw.pw = nil
 	sw.currentDate = ""
 	sw.currentPath = ""

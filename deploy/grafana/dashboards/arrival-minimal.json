@@ -183,8 +183,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.5, sum(rate(arrival_processor_delay_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.5, sum(rate(arrival_processor_observed_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "observed p50",
           "range": true,
           "refId": "A"
         },
@@ -194,8 +194,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(arrival_processor_delay_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum(rate(arrival_processor_observed_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "observed p95",
           "range": true,
           "refId": "B"
         },
@@ -205,13 +205,46 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(arrival_processor_delay_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p99",
+          "expr": "histogram_quantile(0.99, sum(rate(arrival_processor_observed_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "observed p99",
           "range": true,
           "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.5, sum(rate(arrival_processor_predicted_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "predicted p50",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum(rate(arrival_processor_predicted_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "predicted p95",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(arrival_processor_predicted_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "predicted p99",
+          "range": true,
+          "refId": "F"
         }
       ],
-      "title": "Delay Distribution",
+      "title": "Delay Distribution (V2)",
       "type": "timeseries"
     },
     {
@@ -279,8 +312,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(arrival_processor_delay_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p99 delay (worst proxy)",
+          "expr": "histogram_quantile(0.99, sum(rate(arrival_processor_observed_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99 observed delay (proxy)",
           "range": true,
           "refId": "B"
         },
@@ -294,6 +327,17 @@
           "legendFormat": "aggregations/sec",
           "range": true,
           "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum(rate(arrival_processor_predicted_delay_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99 predicted delay (proxy)",
+          "range": true,
+          "refId": "D"
         }
       ],
       "title": "Busiest/Worst Routes (Proxy)",
