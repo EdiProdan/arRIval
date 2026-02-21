@@ -9,6 +9,8 @@ type RealtimePosition struct {
 	ObservedAt  string  `json:"observed_at"`
 }
 
+// Deprecated: RealtimeSnapshot is the V1 snapshot contract.
+// Use RealtimeSnapshotV2 once V2 cutover is complete.
 type RealtimeSnapshot struct {
 	GeneratedAt string               `json:"generated_at"`
 	Positions   []RealtimePosition   `json:"positions"`
@@ -16,6 +18,8 @@ type RealtimeSnapshot struct {
 	Meta        RealtimeSnapshotMeta `json:"meta"`
 }
 
+// Deprecated: RealtimeSnapshotMeta is the V1 snapshot meta contract.
+// Use RealtimeSnapshotMetaV2 once V2 cutover is complete.
 type RealtimeSnapshotMeta struct {
 	PositionsCount int `json:"positions_count"`
 	DelaysCount    int `json:"delays_count"`
@@ -31,6 +35,8 @@ type RealtimePositionsBatch struct {
 	Positions []RealtimePosition `json:"positions"`
 }
 
+// Deprecated: RealtimeDelayUpdate is the V1 websocket delay update payload.
+// Use RealtimeObservedDelayUpdate and RealtimePredictedDelayUpdate.
 type RealtimeDelayUpdate struct {
 	Delay DelayEvent `json:"delay"`
 }

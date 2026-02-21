@@ -1,5 +1,7 @@
 package contracts
 
+// Deprecated: DelayEvent is the V1 delay contract on topic "bus-delays".
+// Use ObservedDelayV2 and PredictedDelayV2.
 type DelayEvent struct {
 	PolazakID     string  `json:"polazak_id"`
 	VoznjaBusID   int64   `json:"voznja_bus_id"`

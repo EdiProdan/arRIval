@@ -3,6 +3,9 @@
 This document defines the **practical data contract** used by this project.
 It is intended for programming work: parsing, validation, joins, enrichment, and delay-related modeling.
 
+For V2 delay runtime payload contracts, use:
+- [`delay-v2-contract.md`](delay-v2-contract.md)
+
 ## 1) Scope and Trust Model
 
 This project uses a **dual-truth** schema model:
