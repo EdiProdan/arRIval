@@ -68,7 +68,18 @@ func TestServerSnapshotEmptyAndPopulated(t *testing.T) {
 
 func TestServerWebsocketReceivesUpdatesAndHeartbeat(t *testing.T) {
 	store := NewStore(StoreConfig{})
-	hub := NewHub(HubConfig{PingInterval: 50 * time.Millisecond})
+	connected := make(chan struct{}, 1)
+	hub := NewHub(HubConfig{
+		PingInterval: 50 * time.Millisecond,
+		Callbacks: HubCallbacks{
+			OnConnect: func() {
+				select {
+				case connected <- struct{}{}:
+				default:
+				}
+			},
+		},
+	})
 	server := NewServer(ServerConfig{Store: store, Hub: hub})
 	defer server.Close()
 
@@ -77,6 +88,12 @@ func TestServerWebsocketReceivesUpdatesAndHeartbeat(t *testing.T) {
 
 	conn := dialTestWS(t, httpServer.URL, "/v1/ws")
 	defer conn.Close()
+
+	select {
+	case <-connected:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("websocket client was not registered in hub before publish")
+	}
 
 	observedAt := time.Date(2026, 2, 18, 11, 10, 0, 0, time.UTC)
 	if err := server.HandlePositionsRecord("bus-positions-raw", mustPositionsPayload(t), observedAt); err != nil {
