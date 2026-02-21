@@ -29,6 +29,7 @@ The structure follows the Diátaxis framework:
 ## Reference
 
 - [`reference/data-schema.md`](reference/data-schema.md)
+- [`reference/delay-v2-contract.md`](reference/delay-v2-contract.md)
 - [`reference/api/openapi-preview.json`](reference/api/openapi-preview.json)
 - [`reference/architecture/current-system.md`](reference/architecture/current-system.md)
 - [`reference/architecture/current-architecture.mmd`](reference/architecture/current-architecture.mmd)

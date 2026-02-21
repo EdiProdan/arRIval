@@ -2,6 +2,11 @@
 
 This document explains how "delay" is produced and used across the system, from raw bus positions to realtime UI and Gold aggregations.
 
+V1 scope note (as of February 21, 2026):
+- This page describes the currently active V1 runtime delay flow (`bus-delays`, `delay_update`, snapshot `delays`).
+- The finalized V2 payload contract is documented in [`../reference/delay-v2-contract.md`](../reference/delay-v2-contract.md).
+- Runtime cutover to V2 topics/payloads is planned in later phases of [`v2-implementation-plan.md`](v2-implementation-plan.md).
+
 ## 1) Delay Definition
 
 At runtime, delay is computed as:
@@ -348,4 +353,3 @@ Look for:
 - `actual_time` is processing-time (`ingestedAt`) per consumed raw Kafka record.
 - Gold files are rewritten on each flush for a date partition.
 - Realtime store is latest-state, not full history.
-
