@@ -25,7 +25,7 @@ import (
 
 const (
 	defaultBrokers       = "localhost:19092"
-	defaultInputTopic    = "bus-delays"
+	defaultInputTopic    = contracts.TopicBusDelayObservedV2
 	defaultConsumerGroup = "arrival-aggregator"
 	defaultGoldDir       = "data/gold"
 	defaultMetricsAddr   = ":9103"
@@ -46,7 +46,7 @@ func main() {
 	defer stop()
 
 	brokers := envutil.CSVEnv("ARRIVAL_KAFKA_BROKERS", defaultBrokers)
-	inputTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_TOPIC", defaultInputTopic)
+	inputTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_OBSERVED_TOPIC", defaultInputTopic)
 	consumerGroup := envutil.StringEnv("ARRIVAL_AGGREGATOR_GROUP", defaultConsumerGroup)
 	goldDir := envutil.StringEnv("ARRIVAL_GOLD_DIR", defaultGoldDir)
 	onTimeSeconds := envutil.IntEnv("ARRIVAL_ON_TIME_SECONDS", defaultOnTimeSeconds)
@@ -136,9 +136,9 @@ func newAggregatorMetrics() aggregatorMetrics {
 }
 
 func consumeDelayRecord(state map[aggregatorlogic.AggregateKey]*aggregatorlogic.AggregateBucket, rec *kgo.Record, onTimeSeconds int) error {
-	var event contracts.DelayEvent
+	var event contracts.ObservedDelayV2
 	if err := json.Unmarshal(rec.Value, &event); err != nil {
-		return fmt.Errorf("unmarshal delay event: %w", err)
+		return fmt.Errorf("unmarshal observed delay event: %w", err)
 	}
 
 	if err := aggregatorlogic.ConsumeEvent(state, event, onTimeSeconds); err != nil {

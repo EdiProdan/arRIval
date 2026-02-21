@@ -14,7 +14,7 @@ type ServerCallbacks struct {
 	OnKafkaRecord      func(topic string)
 	OnInvalidPositions func(count int)
 	OnSnapshotRequest  func()
-	OnStateChange      func(positions, delays int)
+	OnStateChange      func(positions, observedDelays, predictedDelays int)
 }
 
 type ServerConfig struct {
@@ -91,28 +91,53 @@ func (s *Server) HandlePositionsRecord(topic string, payload []byte, observedAt 
 	return nil
 }
 
-func (s *Server) HandleDelayRecord(topic string, payload []byte, observedAt time.Time) error {
+func (s *Server) HandleObservedDelayRecord(topic string, payload []byte, observedAt time.Time) error {
 	if s.callbacks.OnKafkaRecord != nil {
 		s.callbacks.OnKafkaRecord(topic)
 	}
 
-	event, err := ParseDelayRecord(payload)
+	event, err := ParseObservedDelayRecord(payload)
 	if err != nil {
 		return err
 	}
 
-	s.store.UpsertDelay(event)
+	s.store.UpsertObservedDelay(event)
 	s.store.PruneExpired()
 	s.emitStateCounts()
 
-	payloadBytes, err := marshalEnvelope("delay_update", observedAt.UTC(), contracts.RealtimeDelayUpdate{
-		Delay: event,
+	payloadBytes, err := marshalEnvelope(contracts.RealtimeEventDelayObservedUpdateV2, observedAt.UTC(), contracts.RealtimeObservedDelayUpdate{
+		ObservedDelay: event,
 	})
 	if err != nil {
 		return err
 	}
 
-	s.hub.Broadcast("delay_update", payloadBytes)
+	s.hub.Broadcast(contracts.RealtimeEventDelayObservedUpdateV2, payloadBytes)
+	return nil
+}
+
+func (s *Server) HandlePredictedDelayRecord(topic string, payload []byte, observedAt time.Time) error {
+	if s.callbacks.OnKafkaRecord != nil {
+		s.callbacks.OnKafkaRecord(topic)
+	}
+
+	event, err := ParsePredictedDelayRecord(payload)
+	if err != nil {
+		return err
+	}
+
+	s.store.UpsertPredictedDelay(event)
+	s.store.PruneExpired()
+	s.emitStateCounts()
+
+	payloadBytes, err := marshalEnvelope(contracts.RealtimeEventDelayPredictionUpdateV2, observedAt.UTC(), contracts.RealtimePredictedDelayUpdate{
+		PredictedDelay: event,
+	})
+	if err != nil {
+		return err
+	}
+
+	s.hub.Broadcast(contracts.RealtimeEventDelayPredictionUpdateV2, payloadBytes)
 	return nil
 }
 
@@ -154,8 +179,8 @@ func (s *Server) emitStateCounts() {
 	if s.callbacks.OnStateChange == nil {
 		return
 	}
-	positions, delays := s.store.Counts()
-	s.callbacks.OnStateChange(positions, delays)
+	positions, observedDelays, predictedDelays := s.store.Counts()
+	s.callbacks.OnStateChange(positions, observedDelays, predictedDelays)
 }
 
 func marshalEnvelope(messageType string, ts time.Time, data any) ([]byte, error) {

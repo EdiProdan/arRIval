@@ -1,10 +1,10 @@
 # Reference: Delay V2 Contract
 
-This page defines the V2 delay contracts planned for cutover.
+This page defines the active V2 delay contracts after cutover.
 
 Status on **February 21, 2026**:
 - V2 contracts are finalized in docs and `internal/contracts`.
-- Runtime services still publish/consume V1 delay payloads until later phases.
+- Runtime services use V2 observed/predicted topics and V2 realtime payloads.
 
 ## Kafka Topics
 
@@ -78,6 +78,10 @@ Go type: `internal/contracts/realtime_v2.go` (`RealtimeSnapshotV2`)
 - `meta.observed_delays_count`
 - `meta.predicted_delays_count`
 
+Realtime state precedence rule:
+- Observed delays are authoritative for progressed stops.
+- On observed upsert, predicted entries for the same `trip_id` with `station_seq <= observed.station_seq` are removed from snapshot state.
+
 ### Websocket payloads (`/v1/ws`)
 
 Envelope type values:
@@ -90,10 +94,7 @@ Payload wrappers:
 
 ## V1 Deprecation Notice
 
-The following V1 contracts remain temporarily for transition only:
-- Topic `bus-delays`
+The following V1 contracts remain only as deprecated code artifacts until final cleanup:
+- Topic constant `TopicBusDelaysV1`
 - Event type `DelayEvent` (`internal/contracts/delay_event.go`)
-- Snapshot field `delays` and `meta.delays_count`
-- Websocket type `delay_update` with payload `RealtimeDelayUpdate`
-
-They are marked deprecated in code and will be removed in later cutover phases.
+- Legacy snapshot/ws contract types in `internal/contracts/realtime.go`

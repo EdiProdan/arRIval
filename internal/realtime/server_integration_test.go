@@ -48,21 +48,34 @@ func TestServerSnapshotEmptyAndPopulated(t *testing.T) {
 	defer httpServer.Close()
 
 	initial := getSnapshot(t, httpServer.URL+"/v1/snapshot")
-	if initial.Meta.PositionsCount != 0 || initial.Meta.DelaysCount != 0 {
-		t.Fatalf("initial counts = (%d,%d), want (0,0)", initial.Meta.PositionsCount, initial.Meta.DelaysCount)
+	if initial.Meta.PositionsCount != 0 || initial.Meta.ObservedDelaysCount != 0 || initial.Meta.PredictedDelaysCount != 0 {
+		t.Fatalf(
+			"initial counts = (%d,%d,%d), want (0,0,0)",
+			initial.Meta.PositionsCount,
+			initial.Meta.ObservedDelaysCount,
+			initial.Meta.PredictedDelaysCount,
+		)
 	}
 
 	observedAt := time.Date(2026, 2, 18, 11, 0, 0, 0, time.UTC)
 	if err := server.HandlePositionsRecord("bus-positions-raw", mustPositionsPayload(t), observedAt); err != nil {
 		t.Fatalf("HandlePositionsRecord: %v", err)
 	}
-	if err := server.HandleDelayRecord("bus-delays", mustDelayPayload(t), observedAt); err != nil {
-		t.Fatalf("HandleDelayRecord: %v", err)
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 5), observedAt); err != nil {
+		t.Fatalf("HandlePredictedDelayRecord: %v", err)
+	}
+	if err := server.HandleObservedDelayRecord("bus-delay-observed-v2", mustObservedPayload(t, 5), observedAt); err != nil {
+		t.Fatalf("HandleObservedDelayRecord: %v", err)
 	}
 
 	snapshot := getSnapshot(t, httpServer.URL+"/v1/snapshot")
-	if snapshot.Meta.PositionsCount != 1 || snapshot.Meta.DelaysCount != 1 {
-		t.Fatalf("snapshot counts = (%d,%d), want (1,1)", snapshot.Meta.PositionsCount, snapshot.Meta.DelaysCount)
+	if snapshot.Meta.PositionsCount != 1 || snapshot.Meta.ObservedDelaysCount != 1 || snapshot.Meta.PredictedDelaysCount != 0 {
+		t.Fatalf(
+			"snapshot counts = (%d,%d,%d), want (1,1,0)",
+			snapshot.Meta.PositionsCount,
+			snapshot.Meta.ObservedDelaysCount,
+			snapshot.Meta.PredictedDelaysCount,
+		)
 	}
 }
 
@@ -99,12 +112,16 @@ func TestServerWebsocketReceivesUpdatesAndHeartbeat(t *testing.T) {
 	if err := server.HandlePositionsRecord("bus-positions-raw", mustPositionsPayload(t), observedAt); err != nil {
 		t.Fatalf("HandlePositionsRecord: %v", err)
 	}
-	if err := server.HandleDelayRecord("bus-delays", mustDelayPayload(t), observedAt); err != nil {
-		t.Fatalf("HandleDelayRecord: %v", err)
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 6), observedAt); err != nil {
+		t.Fatalf("HandlePredictedDelayRecord: %v", err)
+	}
+	if err := server.HandleObservedDelayRecord("bus-delay-observed-v2", mustObservedPayload(t, 5), observedAt); err != nil {
+		t.Fatalf("HandleObservedDelayRecord: %v", err)
 	}
 
 	foundPositions := false
-	foundDelay := false
+	foundObserved := false
+	foundPredicted := false
 	foundHeartbeat := false
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
@@ -121,19 +138,62 @@ func TestServerWebsocketReceivesUpdatesAndHeartbeat(t *testing.T) {
 		switch envelope.Type {
 		case "positions_batch":
 			foundPositions = true
-		case "delay_update":
-			foundDelay = true
+		case contracts.RealtimeEventDelayObservedUpdateV2:
+			foundObserved = true
+		case contracts.RealtimeEventDelayPredictionUpdateV2:
+			foundPredicted = true
 		case "heartbeat":
 			foundHeartbeat = true
 		}
 
-		if foundPositions && foundDelay && foundHeartbeat {
+		if foundPositions && foundObserved && foundPredicted && foundHeartbeat {
 			break
 		}
 	}
 
-	if !foundPositions || !foundDelay || !foundHeartbeat {
-		t.Fatalf("found types positions=%v delay=%v heartbeat=%v, want all true", foundPositions, foundDelay, foundHeartbeat)
+	if !foundPositions || !foundObserved || !foundPredicted || !foundHeartbeat {
+		t.Fatalf(
+			"found types positions=%v observed=%v predicted=%v heartbeat=%v, want all true",
+			foundPositions,
+			foundObserved,
+			foundPredicted,
+			foundHeartbeat,
+		)
+	}
+}
+
+func TestServerSnapshotObservedSupersedesProgressedPredictions(t *testing.T) {
+	store := NewStore(StoreConfig{})
+	hub := NewHub(HubConfig{PingInterval: 100 * time.Millisecond})
+	server := NewServer(ServerConfig{Store: store, Hub: hub})
+	defer server.Close()
+
+	httpServer := httptest.NewServer(server.Routes())
+	defer httpServer.Close()
+
+	observedAt := time.Date(2026, 2, 18, 11, 20, 0, 0, time.UTC)
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 4), observedAt); err != nil {
+		t.Fatalf("HandlePredictedDelayRecord seq=4: %v", err)
+	}
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 5), observedAt); err != nil {
+		t.Fatalf("HandlePredictedDelayRecord seq=5: %v", err)
+	}
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 6), observedAt); err != nil {
+		t.Fatalf("HandlePredictedDelayRecord seq=6: %v", err)
+	}
+	if err := server.HandleObservedDelayRecord("bus-delay-observed-v2", mustObservedPayload(t, 5), observedAt); err != nil {
+		t.Fatalf("HandleObservedDelayRecord seq=5: %v", err)
+	}
+
+	snapshot := getSnapshot(t, httpServer.URL+"/v1/snapshot")
+	if snapshot.Meta.ObservedDelaysCount != 1 {
+		t.Fatalf("ObservedDelaysCount = %d, want 1", snapshot.Meta.ObservedDelaysCount)
+	}
+	if snapshot.Meta.PredictedDelaysCount != 1 {
+		t.Fatalf("PredictedDelaysCount = %d, want 1", snapshot.Meta.PredictedDelaysCount)
+	}
+	if snapshot.PredictedDelays[0].StationSeq != 6 {
+		t.Fatalf("remaining predicted StationSeq = %d, want 6", snapshot.PredictedDelays[0].StationSeq)
 	}
 }
 
@@ -176,7 +236,7 @@ func getStatusCode(t *testing.T, url string) int {
 	return resp.StatusCode
 }
 
-func getSnapshot(t *testing.T, url string) contracts.RealtimeSnapshot {
+func getSnapshot(t *testing.T, url string) contracts.RealtimeSnapshotV2 {
 	t.Helper()
 	resp, err := http.Get(url)
 	if err != nil {
@@ -189,7 +249,7 @@ func getSnapshot(t *testing.T, url string) contracts.RealtimeSnapshot {
 		t.Fatalf("read body: %v", err)
 	}
 
-	var snapshot contracts.RealtimeSnapshot
+	var snapshot contracts.RealtimeSnapshotV2
 	if err := json.Unmarshal(body, &snapshot); err != nil {
 		t.Fatalf("unmarshal snapshot: %v body=%s", err, string(body))
 	}
@@ -221,22 +281,46 @@ func mustPositionsPayload(t *testing.T) []byte {
 	return payload
 }
 
-func mustDelayPayload(t *testing.T) []byte {
+func mustObservedPayload(t *testing.T, stationSeq int64) []byte {
 	t.Helper()
-	payload, err := json.Marshal(contracts.DelayEvent{
-		PolazakID:     "121",
-		VoznjaBusID:   121,
-		StationID:     1001,
-		StationName:   "Main",
-		DistanceM:     15,
-		LinVarID:      "L1A",
-		BrojLinije:    "1",
-		ScheduledTime: "2026-02-18T11:05:00Z",
-		ActualTime:    "2026-02-18T11:10:00Z",
-		DelaySeconds:  300,
+	payload, err := json.Marshal(contracts.ObservedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      1000 + stationSeq,
+		StationName:    "Main",
+		StationSeq:     stationSeq,
+		DistanceM:      15,
+		LinVarID:       "L1A",
+		BrojLinije:     "1",
+		ScheduledTime:  "2026-02-18T11:05:00Z",
+		ObservedTime:   "2026-02-18T11:10:00Z",
+		DelaySeconds:   300,
+		TrackerVersion: "v2",
 	})
 	if err != nil {
-		t.Fatalf("marshal delay payload: %v", err)
+		t.Fatalf("marshal observed payload: %v", err)
+	}
+	return payload
+}
+
+func mustPredictedPayload(t *testing.T, stationSeq int64) []byte {
+	t.Helper()
+	payload, err := json.Marshal(contracts.PredictedDelayV2{
+		TripID:                "trip-121",
+		VoznjaBusID:           121,
+		StationID:             1000 + stationSeq,
+		StationName:           "Main",
+		StationSeq:            stationSeq,
+		LinVarID:              "L1A",
+		BrojLinije:            "1",
+		ScheduledTime:         "2026-02-18T11:05:00Z",
+		PredictedTime:         "2026-02-18T11:10:00Z",
+		PredictedDelaySeconds: 300,
+		GeneratedAt:           "2026-02-18T11:00:00Z",
+		TrackerVersion:        "v2",
+	})
+	if err != nil {
+		t.Fatalf("marshal predicted payload: %v", err)
 	}
 	return payload
 }

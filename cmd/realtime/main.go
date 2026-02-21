@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/EdiProdan/arRIval/internal/contracts"
 	"github.com/EdiProdan/arRIval/internal/envutil"
 	"github.com/EdiProdan/arRIval/internal/metrics"
 	"github.com/EdiProdan/arRIval/internal/realtime"
@@ -17,12 +18,13 @@ import (
 )
 
 const (
-	defaultBrokers        = "localhost:19092"
-	defaultPositionsTopic = "bus-positions-raw"
-	defaultDelaysTopic    = "bus-delays"
-	defaultConsumerGroup  = "arrival-realtime"
-	defaultHTTPAddr       = ":8080"
-	defaultMetricsAddr    = ":9104"
+	defaultBrokers              = "localhost:19092"
+	defaultPositionsTopic       = "bus-positions-raw"
+	defaultObservedDelaysTopic  = contracts.TopicBusDelayObservedV2
+	defaultPredictedDelaysTopic = contracts.TopicBusDelayPredictedV2
+	defaultConsumerGroup        = "arrival-realtime"
+	defaultHTTPAddr             = ":8080"
+	defaultMetricsAddr          = ":9104"
 
 	defaultPositionsTTL = 5 * time.Minute
 	defaultDelaysTTL    = 90 * time.Minute
@@ -40,7 +42,8 @@ type realtimeMetrics struct {
 	wsDroppedTotal        *prometheus.CounterVec
 	snapshotRequestsTotal prometheus.Counter
 	statePositions        prometheus.Gauge
-	stateDelays           prometheus.Gauge
+	stateObservedDelays   prometheus.Gauge
+	statePredictedDelays  prometheus.Gauge
 	invalidPositionsTotal prometheus.Counter
 }
 
@@ -54,7 +57,8 @@ func main() {
 
 	brokers := envutil.CSVEnv("ARRIVAL_KAFKA_BROKERS", defaultBrokers)
 	positionsTopic := envutil.StringEnv("ARRIVAL_KAFKA_TOPIC", defaultPositionsTopic)
-	delaysTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_TOPIC", defaultDelaysTopic)
+	observedDelaysTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_OBSERVED_TOPIC", defaultObservedDelaysTopic)
+	predictedDelaysTopic := envutil.StringEnv("ARRIVAL_KAFKA_DELAY_PREDICTED_TOPIC", defaultPredictedDelaysTopic)
 	consumerGroup := envutil.StringEnv("ARRIVAL_REALTIME_GROUP", defaultConsumerGroup)
 	httpAddr := envutil.StringEnv("ARRIVAL_REALTIME_HTTP_ADDR", defaultHTTPAddr)
 	metricsAddr := envutil.StringEnv("ARRIVAL_REALTIME_METRICS_ADDR", defaultMetricsAddr)
@@ -115,9 +119,10 @@ func main() {
 			OnSnapshotRequest: func() {
 				collector.snapshotRequestsTotal.Inc()
 			},
-			OnStateChange: func(positions, delays int) {
+			OnStateChange: func(positions, observed, predicted int) {
 				collector.statePositions.Set(float64(positions))
-				collector.stateDelays.Set(float64(delays))
+				collector.stateObservedDelays.Set(float64(observed))
+				collector.statePredictedDelays.Set(float64(predicted))
 			},
 		},
 	})
@@ -138,7 +143,7 @@ func main() {
 	consumer, err := kgo.NewClient(
 		kgo.SeedBrokers(brokers...),
 		kgo.ConsumerGroup(consumerGroup),
-		kgo.ConsumeTopics(positionsTopic, delaysTopic),
+		kgo.ConsumeTopics(positionsTopic, observedDelaysTopic, predictedDelaysTopic),
 	)
 	if err != nil {
 		log.Fatalf("create consumer client: %v", err)
@@ -147,10 +152,11 @@ func main() {
 
 	server.SetReady(true)
 	log.Printf(
-		"realtime started: group=%s positions_topic=%s delays_topic=%s positions_ttl=%s delays_ttl=%s ping_interval=%s",
+		"realtime started: group=%s positions_topic=%s observed_delays_topic=%s predicted_delays_topic=%s positions_ttl=%s delays_ttl=%s ping_interval=%s",
 		consumerGroup,
 		positionsTopic,
-		delaysTopic,
+		observedDelaysTopic,
+		predictedDelaysTopic,
 		positionsTTL,
 		delaysTTL,
 		pingInterval,
@@ -181,8 +187,10 @@ func main() {
 			switch rec.Topic {
 			case positionsTopic:
 				handleErr = server.HandlePositionsRecord(rec.Topic, rec.Value, observedAt)
-			case delaysTopic:
-				handleErr = server.HandleDelayRecord(rec.Topic, rec.Value, observedAt)
+			case observedDelaysTopic:
+				handleErr = server.HandleObservedDelayRecord(rec.Topic, rec.Value, observedAt)
+			case predictedDelaysTopic:
+				handleErr = server.HandlePredictedDelayRecord(rec.Topic, rec.Value, observedAt)
 			default:
 				log.Printf("status=warn stage=consume topic=%s partition=%d offset=%d msg=unknown topic", rec.Topic, rec.Partition, rec.Offset)
 			}
@@ -253,9 +261,14 @@ func newRealtimeMetrics() realtimeMetrics {
 		Help: "Current number of latest positions kept in in-memory state.",
 	})
 
-	stateDelays := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "arrival_realtime_state_delays",
-		Help: "Current number of latest delays kept in in-memory state.",
+	stateObservedDelays := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "arrival_realtime_state_observed_delays",
+		Help: "Current number of latest observed delays kept in in-memory state.",
+	})
+
+	statePredictedDelays := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "arrival_realtime_state_predicted_delays",
+		Help: "Current number of latest predicted delays kept in in-memory state.",
 	})
 
 	invalidPositionsTotal := prometheus.NewCounter(prometheus.CounterOpts{
@@ -272,7 +285,8 @@ func newRealtimeMetrics() realtimeMetrics {
 		wsDroppedTotal,
 		snapshotRequestsTotal,
 		statePositions,
-		stateDelays,
+		stateObservedDelays,
+		statePredictedDelays,
 		invalidPositionsTotal,
 	)
 
@@ -285,7 +299,8 @@ func newRealtimeMetrics() realtimeMetrics {
 		wsDroppedTotal:        wsDroppedTotal,
 		snapshotRequestsTotal: snapshotRequestsTotal,
 		statePositions:        statePositions,
-		stateDelays:           stateDelays,
+		stateObservedDelays:   stateObservedDelays,
+		statePredictedDelays:  statePredictedDelays,
 		invalidPositionsTotal: invalidPositionsTotal,
 	}
 }
