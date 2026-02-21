@@ -81,6 +81,8 @@ Phase 1 completion checklist:
 - `go test ./...` passes with both V1 and V2 contracts present
 - `go build ./...` passes with V2 contracts available for later phases
 
+**Status:** Completed
+
 ## Phase 2 - Stateful Trip Tracker Engine
 Goal: Build new tracker core that locks trip and tracks forward stop progression with smoothed delay offset.
 
