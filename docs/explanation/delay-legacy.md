@@ -89,7 +89,7 @@ Example:
 - nearest candidate becomes previous day `2025-01-01T23:59:00Z`
 - computed delay: `+120` seconds
 
-This is covered by `TestBuildDelayMidnightAlignmentUsesNearestDay` in `internal/processorlogic/delay_test.go`.
+Historically this was covered by `TestBuildDelayMidnightAlignmentUsesNearestDay` in `internal/processorlogic/delay_test.go` before V1 matcher removal in Phase 3.
 
 ## 5) Delay Event Schema (`bus-delays`)
 
