@@ -81,6 +81,8 @@ Phase 1 completion checklist:
 - `go test ./...` passes with both V1 and V2 contracts present
 - `go build ./...` passes with V2 contracts available for later phases
 
+**Status:** Completed
+
 ## Phase 2 - Stateful Trip Tracker Engine
 Goal: Build new tracker core that locks trip and tracks forward stop progression with smoothed delay offset.
 
@@ -91,6 +93,8 @@ Exit criteria:
 - Monotonic stop progression (`RedniBrojStanice`) enforced
 - Relock/reset rules implemented for bad lock or stale state
 - Core unit tests passing for normal and failure paths
+
+**Status:** Completed
 
 ## Phase 3 - Processor Cutover to V2 Data Plane
 Goal: Replace current delay matcher in processor and publish only V2 events.
