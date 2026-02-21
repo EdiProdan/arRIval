@@ -4,10 +4,10 @@ Goal: get the full data pipeline running locally and verify end-to-end output.
 
 This tutorial is for first-time contributors. Follow it in order.
 
-## Phase 3 transition note
+## Phase 4 cutover note
 
-As of **February 21, 2026**, `processor` emits delay events only to V2 topics and writes split V2 Silver files.  
-`aggregator` and `realtime` delay consumers still use legacy `bus-delays` until Phase 4 cutover.
+As of **February 21, 2026**, all runtime services use V2 delay streams.  
+`processor` emits observed/predicted V2 events, `aggregator` consumes observed V2, and `realtime` consumes both V2 topics.
 
 ## Prerequisites
 

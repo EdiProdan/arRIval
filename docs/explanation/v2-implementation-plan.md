@@ -118,6 +118,8 @@ Exit criteria:
 - Gold aggregation logic uses observed delays only
 - Service integration tests pass against V2 contracts
 
+**Status:** Completed
+
 ## Phase 5 - UI and Operational Visibility Update
 Goal: Expose V2 semantics in UI and monitoring.
 

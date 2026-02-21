@@ -2,13 +2,13 @@
 
 Use this guide when you want to start, monitor, and stop the complete compose runtime.
 
-## Phase 3 transition note
+## Phase 4 cutover note
 
-As of **February 21, 2026**, `processor` publishes delay events only to:
+As of **February 21, 2026**, the stack runs fully on V2 delay topics:
 - `bus-delay-observed-v2`
 - `bus-delay-predicted-v2`
 
-`aggregator` and `realtime` remain on legacy `bus-delays` until Phase 4 cutover.
+`aggregator` consumes observed V2 events only; `realtime` consumes observed + predicted V2 events.
 
 ## Start
 

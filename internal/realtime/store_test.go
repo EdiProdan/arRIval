@@ -60,22 +60,35 @@ func TestStorePruneExpired(t *testing.T) {
 			ObservedAt: now.Format(time.RFC3339Nano),
 		},
 	})
-	store.UpsertDelay(contracts.DelayEvent{
-		VoznjaBusID:  7,
-		StationID:    100,
-		DelaySeconds: 30,
+	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+		TripID:         "trip-7",
+		VoznjaBusID:    7,
+		StationID:      100,
+		StationSeq:     1,
+		ObservedTime:   now.Format(time.RFC3339Nano),
+		DelaySeconds:   30,
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:                "trip-7",
+		VoznjaBusID:           7,
+		StationID:             101,
+		StationSeq:            2,
+		PredictedDelaySeconds: 45,
+		GeneratedAt:           now.Format(time.RFC3339Nano),
+		TrackerVersion:        "v2",
 	})
 
 	now = now.Add(90 * time.Second)
-	positionsRemoved, delaysRemoved := store.PruneExpired()
-	if positionsRemoved != 1 || delaysRemoved != 0 {
-		t.Fatalf("removed = (%d,%d), want (1,0)", positionsRemoved, delaysRemoved)
+	positionsRemoved, observedRemoved, predictedRemoved := store.PruneExpired()
+	if positionsRemoved != 1 || observedRemoved != 0 || predictedRemoved != 0 {
+		t.Fatalf("removed = (%d,%d,%d), want (1,0,0)", positionsRemoved, observedRemoved, predictedRemoved)
 	}
 
 	now = now.Add(60 * time.Second)
-	positionsRemoved, delaysRemoved = store.PruneExpired()
-	if positionsRemoved != 0 || delaysRemoved != 1 {
-		t.Fatalf("removed = (%d,%d), want (0,1)", positionsRemoved, delaysRemoved)
+	positionsRemoved, observedRemoved, predictedRemoved = store.PruneExpired()
+	if positionsRemoved != 0 || observedRemoved != 1 || predictedRemoved != 1 {
+		t.Fatalf("removed = (%d,%d,%d), want (0,1,1)", positionsRemoved, observedRemoved, predictedRemoved)
 	}
 }
 
@@ -106,17 +119,155 @@ func TestStoreSnapshotDeterministicOrderAndCounts(t *testing.T) {
 		},
 	})
 
-	store.UpsertDelay(contracts.DelayEvent{VoznjaBusID: 2, StationID: 20, ActualTime: "2026-02-18T10:00:00Z"})
-	store.UpsertDelay(contracts.DelayEvent{VoznjaBusID: 1, StationID: 10, ActualTime: "2026-02-18T10:01:00Z"})
+	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+		TripID:         "trip-2",
+		VoznjaBusID:    2,
+		StationID:      20,
+		StationSeq:     2,
+		ObservedTime:   "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+		TripID:         "trip-1",
+		VoznjaBusID:    1,
+		StationID:      10,
+		StationSeq:     1,
+		ObservedTime:   "2026-02-18T10:01:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-2",
+		VoznjaBusID:    2,
+		StationID:      30,
+		StationSeq:     3,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-1",
+		VoznjaBusID:    1,
+		StationID:      20,
+		StationSeq:     2,
+		GeneratedAt:    "2026-02-18T10:01:00Z",
+		TrackerVersion: "v2",
+	})
 
 	snapshot := store.Snapshot()
-	if snapshot.Meta.PositionsCount != 2 || snapshot.Meta.DelaysCount != 2 {
-		t.Fatalf("counts = (%d,%d), want (2,2)", snapshot.Meta.PositionsCount, snapshot.Meta.DelaysCount)
+	if snapshot.Meta.PositionsCount != 2 || snapshot.Meta.ObservedDelaysCount != 2 || snapshot.Meta.PredictedDelaysCount != 2 {
+		t.Fatalf(
+			"counts = (%d,%d,%d), want (2,2,2)",
+			snapshot.Meta.PositionsCount,
+			snapshot.Meta.ObservedDelaysCount,
+			snapshot.Meta.PredictedDelaysCount,
+		)
 	}
 	if snapshot.Positions[0].Key != "voznja_bus_id:1" || snapshot.Positions[1].Key != "voznja_bus_id:2" {
 		t.Fatalf("position order = [%s,%s], want [voznja_bus_id:1,voznja_bus_id:2]", snapshot.Positions[0].Key, snapshot.Positions[1].Key)
 	}
-	if snapshot.Delays[0].VoznjaBusID != 1 || snapshot.Delays[1].VoznjaBusID != 2 {
-		t.Fatalf("delay order = [%d,%d], want [1,2]", snapshot.Delays[0].VoznjaBusID, snapshot.Delays[1].VoznjaBusID)
+	if snapshot.ObservedDelays[0].TripID != "trip-1" || snapshot.ObservedDelays[1].TripID != "trip-2" {
+		t.Fatalf("observed order = [%s,%s], want [trip-1,trip-2]", snapshot.ObservedDelays[0].TripID, snapshot.ObservedDelays[1].TripID)
+	}
+	if snapshot.PredictedDelays[0].TripID != "trip-1" || snapshot.PredictedDelays[1].TripID != "trip-2" {
+		t.Fatalf("predicted order = [%s,%s], want [trip-1,trip-2]", snapshot.PredictedDelays[0].TripID, snapshot.PredictedDelays[1].TripID)
+	}
+}
+
+func TestStoreObservedUpsertRemovesMatchingPredictedStop(t *testing.T) {
+	now := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
+	store := NewStore(StoreConfig{
+		Now: func() time.Time { return now },
+	})
+
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      5,
+		StationSeq:     5,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      5,
+		StationSeq:     5,
+		ObservedTime:   "2026-02-18T10:02:00Z",
+		TrackerVersion: "v2",
+	})
+
+	snapshot := store.Snapshot()
+	if snapshot.Meta.ObservedDelaysCount != 1 {
+		t.Fatalf("ObservedDelaysCount = %d, want 1", snapshot.Meta.ObservedDelaysCount)
+	}
+	if snapshot.Meta.PredictedDelaysCount != 0 {
+		t.Fatalf("PredictedDelaysCount = %d, want 0", snapshot.Meta.PredictedDelaysCount)
+	}
+}
+
+func TestStoreObservedUpsertRemovesProgressedPredictions(t *testing.T) {
+	now := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
+	store := NewStore(StoreConfig{
+		Now: func() time.Time { return now },
+	})
+
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      30,
+		StationSeq:     3,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      40,
+		StationSeq:     4,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      50,
+		StationSeq:     5,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      60,
+		StationSeq:     6,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+		TripID:         "trip-999",
+		VoznjaBusID:    999,
+		StationID:      40,
+		StationSeq:     4,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "v2",
+	})
+
+	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		StationID:      50,
+		StationSeq:     5,
+		ObservedTime:   "2026-02-18T10:02:00Z",
+		TrackerVersion: "v2",
+	})
+
+	snapshot := store.Snapshot()
+	if snapshot.Meta.PredictedDelaysCount != 2 {
+		t.Fatalf("PredictedDelaysCount = %d, want 2", snapshot.Meta.PredictedDelaysCount)
+	}
+
+	for _, event := range snapshot.PredictedDelays {
+		if event.TripID == "trip-121" && event.StationSeq <= 5 {
+			t.Fatalf("found stale predicted entry: trip=%s seq=%d", event.TripID, event.StationSeq)
+		}
 	}
 }

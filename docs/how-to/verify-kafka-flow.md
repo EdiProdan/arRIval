@@ -1,11 +1,10 @@
 # How-to: Verify Kafka Flow
 
-Use this guide to confirm live ingestion and Phase 3 V2 delay events are flowing through Redpanda.
+Use this guide to confirm live ingestion and V2 delay events are flowing through Redpanda.
 
-## Phase 3 transition note
+## Phase 4 cutover note
 
-As of **February 21, 2026**, `processor` publishes only V2 delay topics.  
-`aggregator` and `realtime` still consume legacy `bus-delays` until Phase 4 cutover.
+As of **February 21, 2026**, `processor`, `aggregator`, and `realtime` all use V2 delay topics.
 
 ## Preconditions
 
@@ -23,7 +22,6 @@ Expected topics:
 - `bus-positions-raw`
 - `bus-delay-observed-v2`
 - `bus-delay-predicted-v2`
-- `bus-delays` (legacy downstream topic, Phase 4 removal)
 
 ## 2) Consume one raw message
 
