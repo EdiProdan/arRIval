@@ -94,6 +94,8 @@ Exit criteria:
 - Relock/reset rules implemented for bad lock or stale state
 - Core unit tests passing for normal and failure paths
 
+**Status:** Completed
+
 ## Phase 3 - Processor Cutover to V2 Data Plane
 Goal: Replace current delay matcher in processor and publish only V2 events.
 
