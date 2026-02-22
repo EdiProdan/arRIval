@@ -141,6 +141,10 @@ button:disabled {
   gap: 1rem;
 }
 
+.layout-grid--single {
+  grid-template-columns: 1fr;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid #e3ece8;

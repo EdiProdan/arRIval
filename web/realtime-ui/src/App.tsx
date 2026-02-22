@@ -1,4 +1,3 @@
-import { DelayBoard } from "./components/DelayBoard";
 import { MapPanel } from "./components/MapPanel";
 import { useRealtimeFeed } from "./hooks/useRealtimeFeed";
 import { formatZagrebTime } from "./utils/time";
@@ -62,9 +61,13 @@ export default function App(): JSX.Element {
 
       {error ? <aside className="error-banner">Snapshot error: {error}</aside> : null}
 
-      <main className="layout-grid">
-        <MapPanel positions={positions} stale={stale} />
-        <DelayBoard observedDelays={observedDelays} predictedDelays={predictedDelays} stale={stale} />
+      <main className="layout-grid layout-grid--single">
+        <MapPanel
+          positions={positions}
+          observedDelays={observedDelays}
+          predictedDelays={predictedDelays}
+          stale={stale}
+        />
       </main>
 
       <footer className="footer-meta">

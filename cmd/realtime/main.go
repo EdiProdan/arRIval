@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ const (
 	defaultConsumerGroup        = "arrival-realtime"
 	defaultHTTPAddr             = ":8080"
 	defaultMetricsAddr          = ":9104"
+	defaultStaticDir            = "data"
 
 	defaultPositionsTTL = 5 * time.Minute
 	defaultDelaysTTL    = 90 * time.Minute
@@ -62,6 +64,7 @@ func main() {
 	consumerGroup := envutil.StringEnv("ARRIVAL_REALTIME_GROUP", defaultConsumerGroup)
 	httpAddr := envutil.StringEnv("ARRIVAL_REALTIME_HTTP_ADDR", defaultHTTPAddr)
 	metricsAddr := envutil.StringEnv("ARRIVAL_REALTIME_METRICS_ADDR", defaultMetricsAddr)
+	staticDir := envutil.StringEnv("ARRIVAL_STATIC_DIR", defaultStaticDir)
 	wsClientBuffer := envutil.IntEnv("ARRIVAL_REALTIME_WS_CLIENT_BUFFER", 128)
 
 	positionsTTL, invalidPositionsTTL := envutil.DurationEnv("ARRIVAL_REALTIME_POSITIONS_TTL", defaultPositionsTTL)
@@ -107,8 +110,9 @@ func main() {
 	})
 
 	server := realtime.NewServer(realtime.ServerConfig{
-		Store: store,
-		Hub:   hub,
+		Store:        store,
+		Hub:          hub,
+		StationsPath: filepath.Join(staticDir, "stanice.json"),
 		Callbacks: realtime.ServerCallbacks{
 			OnKafkaRecord: func(topic string) {
 				collector.kafkaRecordsTotal.WithLabelValues(topic).Inc()

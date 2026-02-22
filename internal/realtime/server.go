@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -18,18 +19,20 @@ type ServerCallbacks struct {
 }
 
 type ServerConfig struct {
-	Store     *Store
-	Hub       *Hub
-	Now       func() time.Time
-	Callbacks ServerCallbacks
+	Store        *Store
+	Hub          *Hub
+	StationsPath string
+	Now          func() time.Time
+	Callbacks    ServerCallbacks
 }
 
 type Server struct {
-	store     *Store
-	hub       *Hub
-	now       func() time.Time
-	callbacks ServerCallbacks
-	ready     atomic.Bool
+	store        *Store
+	hub          *Hub
+	stationsPath string
+	now          func() time.Time
+	callbacks    ServerCallbacks
+	ready        atomic.Bool
 }
 
 func NewServer(cfg ServerConfig) *Server {
@@ -39,10 +42,11 @@ func NewServer(cfg ServerConfig) *Server {
 	}
 
 	return &Server{
-		store:     cfg.Store,
-		hub:       cfg.Hub,
-		now:       now,
-		callbacks: cfg.Callbacks,
+		store:        cfg.Store,
+		hub:          cfg.Hub,
+		stationsPath: cfg.StationsPath,
+		now:          now,
+		callbacks:    cfg.Callbacks,
 	}
 }
 
@@ -51,6 +55,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/readyz", s.handleReadyz)
 	mux.HandleFunc("/v1/snapshot", s.handleSnapshot)
+	mux.HandleFunc("/v1/stations", s.handleStations)
 	mux.HandleFunc("/v1/ws", s.handleWS)
 	mux.Handle("/", newUIHandler())
 	return mux
@@ -165,6 +170,20 @@ func (s *Server) handleSnapshot(w http.ResponseWriter, _ *http.Request) {
 	snapshot := s.store.Snapshot()
 	s.emitStateCounts()
 	writeJSON(w, http.StatusOK, snapshot)
+}
+
+func (s *Server) handleStations(w http.ResponseWriter, _ *http.Request) {
+	payload, err := os.ReadFile(s.stationsPath)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "stations_unavailable"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(payload); err != nil {
+		log.Printf("status=error stage=http_write status=%d err=%v", http.StatusOK, err)
+	}
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {

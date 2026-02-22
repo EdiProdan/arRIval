@@ -5,12 +5,58 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/EdiProdan/arRIval/internal/autotrolej"
 	"github.com/EdiProdan/arRIval/internal/contracts"
 )
+
+func TestServerStationsEndpoint(t *testing.T) {
+	store := NewStore(StoreConfig{})
+	hub := NewHub(HubConfig{PingInterval: 100 * time.Millisecond})
+
+	tmpDir := t.TempDir()
+	stationsPath := filepath.Join(tmpDir, "stanice.json")
+	if err := os.WriteFile(stationsPath, []byte(`[{"StanicaId":1,"Naziv":"Main","Kratki":"M","GpsX":14.4,"GpsY":45.3}]`), 0o644); err != nil {
+		t.Fatalf("write stations fixture: %v", err)
+	}
+
+	server := NewServer(ServerConfig{
+		Store:        store,
+		Hub:          hub,
+		StationsPath: stationsPath,
+	})
+	defer server.Close()
+
+	httpServer := httptest.NewServer(server.Routes())
+	defer httpServer.Close()
+
+	resp, err := http.Get(httpServer.URL + "/v1/stations")
+	if err != nil {
+		t.Fatalf("GET /v1/stations: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+
+	var stations []map[string]any
+	if err := json.Unmarshal(body, &stations); err != nil {
+		t.Fatalf("unmarshal stations: %v body=%s", err, string(body))
+	}
+	if len(stations) != 1 {
+		t.Fatalf("len(stations) = %d, want 1", len(stations))
+	}
+}
 
 func TestServerHealthAndReadyz(t *testing.T) {
 	store := NewStore(StoreConfig{})
