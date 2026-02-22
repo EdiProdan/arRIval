@@ -282,6 +282,95 @@ th {
   font-weight: 700;
 }
 
+.bus-popup-layer {
+  max-width: 560px;
+}
+
+.bus-popup-layer .leaflet-popup-content {
+  margin: 0.45rem 0.55rem;
+}
+
+.station-popup-layer .leaflet-popup-content {
+  margin: 0.45rem 0.55rem;
+  font-size: 0.86rem;
+}
+
+.bus-tooltip {
+  min-width: 300px;
+  color: var(--ink);
+}
+
+.bus-tooltip__title {
+  margin: 0 0 0.18rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.bus-tooltip__meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.bus-tooltip__empty {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.bus-tooltip__table-wrap {
+  margin-top: 0.5rem;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #d9e7df;
+  border-radius: 0.45rem;
+}
+
+.bus-tooltip__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bus-tooltip__table th,
+.bus-tooltip__table td {
+  padding: 0.34rem 0.45rem;
+  border-bottom: 1px solid #ebf2ee;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 0.74rem;
+}
+
+.bus-tooltip__table th {
+  position: sticky;
+  top: 0;
+  background: #f4faf7;
+  z-index: 1;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.bus-tooltip__row--visited td:first-child {
+  color: #0d6a54;
+  font-weight: 700;
+}
+
+.bus-tooltip__row--future td:first-child {
+  color: #105f8a;
+  font-weight: 700;
+}
+
+.bus-tooltip__delay--positive {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.bus-tooltip__delay--early {
+  color: #0d6a54;
+  font-weight: 700;
+}
+
 .footer-meta {
   color: var(--ink-muted);
   display: flex;
@@ -302,5 +391,10 @@ th {
 
   .map-frame {
     min-height: 320px;
+  }
+
+  .bus-tooltip {
+    min-width: 0;
+    width: min(86vw, 500px);
   }
 }
