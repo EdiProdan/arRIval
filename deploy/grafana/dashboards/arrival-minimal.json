@@ -415,6 +415,182 @@
       ],
       "title": "System Lag (p95)",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(arrival_processor_observed_events_published_total[5m])",
+          "legendFormat": "observed publish rate",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(arrival_processor_predicted_events_published_total[5m])",
+          "legendFormat": "predicted publish rate",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "arrival_realtime_state_observed_delays",
+          "legendFormat": "realtime observed state size",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "arrival_realtime_state_predicted_delays",
+          "legendFormat": "realtime predicted state size",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Prediction Volume (V2)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Validate skip reason labels with Prometheus before rollout: sum by (reason) (rate(arrival_processor_tracker_skips_total[5m])).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(arrival_processor_observed_events_published_total[5m])) / clamp_min(sum(rate(arrival_processor_observed_events_published_total[5m])) + sum(rate(arrival_processor_tracker_skips_total{reason=~\"no_trip_for_voznja_bus_id|duplicate_station_seq|backward_station_seq|reset_after_invalid_progression|reset_after_stale_state\"}[5m])), 0.000001)",
+          "legendFormat": "lock quality score",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (reason) (rate(arrival_processor_tracker_skips_total{reason=~\"no_trip_for_voznja_bus_id|duplicate_station_seq|backward_station_seq|reset_after_invalid_progression|reset_after_stale_state\"}[5m]))",
+          "legendFormat": "{{reason}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Tracker Lock Quality (V2)",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -434,6 +610,6 @@
   "timezone": "",
   "title": "arRIval - Minimal Operations",
   "uid": "arrival-minimal",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

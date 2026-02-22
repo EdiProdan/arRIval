@@ -45,7 +45,8 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 
 4. Verify Kafka flow:
    - raw topic: `docker compose exec redpanda rpk topic consume bus-positions-raw -n 1`
-   - delay topic: `docker compose exec redpanda rpk topic consume bus-delays -n 1`
+   - observed delay topic: `docker compose exec redpanda rpk topic consume bus-delay-observed-v2 -n 1`
+   - predicted delay topic: `docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1`
 
 5. Verify realtime API:
    - UI: `http://localhost:8080/`
@@ -55,13 +56,15 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 
 6. Verify Parquet outputs (UTC date partition):
    - Bronze: `data/bronze/YYYY-MM-DD/positions.parquet`
-   - Silver: `data/silver/YYYY-MM-DD/delays.parquet`
+   - Silver observed: `data/silver/YYYY-MM-DD/observed_delays_v2.parquet`
+   - Silver predicted: `data/silver/YYYY-MM-DD/predicted_delays_v2.parquet`
    - Gold: `data/gold/YYYY-MM-DD/stats.parquet`
 
 7. Verify observability:
    - Prometheus targets: `http://localhost:9090/targets`
    - Grafana: `http://localhost:3000` (`admin` / `admin`)
    - Dashboard: `arRIval - Minimal Operations`
+   - Lock reason labels check: `curl -sS "http://localhost:9090/api/v1/query?query=sum%20by%20(reason)%20(rate(arrival_processor_tracker_skips_total%5B5m%5D))"`
 
 8. Stop stack:
    - `docker compose down`
