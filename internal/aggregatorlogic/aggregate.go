@@ -33,10 +33,10 @@ type StatsRow struct {
 	WrittenAt       string  `parquet:"name=written_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 }
 
-func ConsumeEvent(state map[AggregateKey]*AggregateBucket, event contracts.DelayEvent, onTimeSeconds int) error {
-	actual, err := parseTimestampUTC(event.ActualTime)
+func ConsumeEvent(state map[AggregateKey]*AggregateBucket, event contracts.ObservedDelay, onTimeSeconds int) error {
+	actual, err := parseTimestampUTC(event.ObservedTime)
 	if err != nil {
-		return fmt.Errorf("parse actual_time %q: %w", event.ActualTime, err)
+		return fmt.Errorf("parse observed_time %q: %w", event.ObservedTime, err)
 	}
 
 	route := strings.TrimSpace(event.BrojLinije)

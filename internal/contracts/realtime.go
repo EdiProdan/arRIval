@@ -9,16 +9,24 @@ type RealtimePosition struct {
 	ObservedAt  string  `json:"observed_at"`
 }
 
+const (
+	RealtimeEventDelayObservedUpdate   = "delay_observed_update"
+	RealtimeEventDelayPredictionUpdate = "delay_prediction_update"
+)
+
+// RealtimeSnapshot is the active snapshot payload contract served by realtime API.
 type RealtimeSnapshot struct {
-	GeneratedAt string               `json:"generated_at"`
-	Positions   []RealtimePosition   `json:"positions"`
-	Delays      []DelayEvent         `json:"delays"`
-	Meta        RealtimeSnapshotMeta `json:"meta"`
+	GeneratedAt     string               `json:"generated_at"`
+	Positions       []RealtimePosition   `json:"positions"`
+	ObservedDelays  []ObservedDelay      `json:"observed_delays"`
+	PredictedDelays []PredictedDelay     `json:"predicted_delays"`
+	Meta            RealtimeSnapshotMeta `json:"meta"`
 }
 
 type RealtimeSnapshotMeta struct {
-	PositionsCount int `json:"positions_count"`
-	DelaysCount    int `json:"delays_count"`
+	PositionsCount       int `json:"positions_count"`
+	ObservedDelaysCount  int `json:"observed_delays_count"`
+	PredictedDelaysCount int `json:"predicted_delays_count"`
 }
 
 type RealtimeEnvelope struct {
@@ -31,8 +39,12 @@ type RealtimePositionsBatch struct {
 	Positions []RealtimePosition `json:"positions"`
 }
 
-type RealtimeDelayUpdate struct {
-	Delay DelayEvent `json:"delay"`
+type RealtimeObservedDelayUpdate struct {
+	ObservedDelay ObservedDelay `json:"observed_delay"`
+}
+
+type RealtimePredictedDelayUpdate struct {
+	PredictedDelay PredictedDelay `json:"predicted_delay"`
 }
 
 type RealtimeHeartbeat struct {

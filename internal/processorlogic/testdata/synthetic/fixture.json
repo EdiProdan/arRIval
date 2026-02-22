@@ -1,0 +1,34 @@
+{
+  "stations": [
+    {"StanicaId": 1, "Naziv": "Stop 1", "Kratki": "S1", "GpsX": 14.44, "GpsY": 45.33},
+    {"StanicaId": 2, "Naziv": "Stop 2", "Kratki": "S2", "GpsX": 14.441, "GpsY": 45.331},
+    {"StanicaId": 3, "Naziv": "Stop 3", "Kratki": "S3", "GpsX": 14.442, "GpsY": 45.332},
+    {"StanicaId": 4, "Naziv": "Stop 4", "Kratki": "S4", "GpsX": 14.443, "GpsY": 45.333}
+  ],
+  "line_paths": [
+    {"Id": 1, "LinVarId": "lv-1", "BrojLinije": "2A", "NazivVarijanteLinije": "Synthetic", "Smjer": "A", "StanicaId": 1, "RedniBrojStanice": 1, "Varijanta": "0"},
+    {"Id": 2, "LinVarId": "lv-1", "BrojLinije": "2A", "NazivVarijanteLinije": "Synthetic", "Smjer": "A", "StanicaId": 2, "RedniBrojStanice": 2, "Varijanta": "0"},
+    {"Id": 3, "LinVarId": "lv-1", "BrojLinije": "2A", "NazivVarijanteLinije": "Synthetic", "Smjer": "A", "StanicaId": 3, "RedniBrojStanice": 3, "Varijanta": "0"},
+    {"Id": 4, "LinVarId": "lv-1", "BrojLinije": "2A", "NazivVarijanteLinije": "Synthetic", "Smjer": "A", "StanicaId": 4, "RedniBrojStanice": 4, "Varijanta": "0"}
+  ],
+  "timetable": [
+    {"Id": 1, "PolazakId": "1001", "StanicaId": 1, "LinVarId": "lv-1", "Polazak": "12:00:00", "RedniBrojStanice": 1, "BrojLinije": "2A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Synthetic", "Naziv": "Stop 1", "GpsX": 14.44, "GpsY": 45.33},
+    {"Id": 2, "PolazakId": "1001", "StanicaId": 2, "LinVarId": "lv-1", "Polazak": "12:02:00", "RedniBrojStanice": 2, "BrojLinije": "2A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Synthetic", "Naziv": "Stop 2", "GpsX": 14.441, "GpsY": 45.331},
+    {"Id": 3, "PolazakId": "1001", "StanicaId": 3, "LinVarId": "lv-1", "Polazak": "12:04:00", "RedniBrojStanice": 3, "BrojLinije": "2A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Synthetic", "Naziv": "Stop 3", "GpsX": 14.442, "GpsY": 45.332},
+    {"Id": 4, "PolazakId": "1001", "StanicaId": 4, "LinVarId": "lv-1", "Polazak": "12:06:00", "RedniBrojStanice": 4, "BrojLinije": "2A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Synthetic", "Naziv": "Stop 4", "GpsX": 14.443, "GpsY": 45.333}
+  ],
+  "inputs": [
+    {
+      "observed_at": "2026-02-21T12:01:00Z",
+      "bus": {"gbr": 701, "lon": 14.44, "lat": 45.33, "voznjaId": 5001, "voznjaBusId": 1001}
+    },
+    {
+      "observed_at": "2026-02-21T12:04:00Z",
+      "bus": {"gbr": 701, "lon": 14.441, "lat": 45.331, "voznjaId": 5001, "voznjaBusId": 1001}
+    },
+    {
+      "observed_at": "2026-02-21T12:07:00Z",
+      "bus": {"gbr": 701, "lon": 14.442, "lat": 45.332, "voznjaId": 5001, "voznjaBusId": 1001}
+    }
+  ]
+}

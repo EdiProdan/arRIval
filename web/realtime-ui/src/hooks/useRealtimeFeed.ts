@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { resolveTransport, parseEnvelope } from "./transport";
 import { applyEnvelope, fromSnapshot } from "../state/realtimeState";
 import { isStale, nextReconnectDelayMs } from "../utils/reconnect";
-import type { ConnectionState, DelayEvent, RealtimePosition } from "../types";
+import type { ConnectionState, ObservedDelay, PredictedDelay, RealtimePosition } from "../types";
 
 const STALE_AFTER_MS = Number(import.meta.env.VITE_STALE_AFTER_MS ?? "45000");
 const MAX_RETRIES = 8;
@@ -11,13 +11,15 @@ const MAX_RETRIES = 8;
 interface FeedState {
   generatedAt: string;
   positionsByKey: Record<string, RealtimePosition>;
-  delaysByKey: Record<string, DelayEvent>;
+  observedByKey: Record<string, ObservedDelay>;
+  predictedByKey: Record<string, PredictedDelay>;
 }
 
 const initialState: FeedState = {
   generatedAt: "",
   positionsByKey: {},
-  delaysByKey: {}
+  observedByKey: {},
+  predictedByKey: {}
 };
 
 export interface RealtimeFeedModel {
@@ -28,7 +30,8 @@ export interface RealtimeFeedModel {
   generatedAt: string;
   lastMessageAt: number | null;
   positions: RealtimePosition[];
-  delays: DelayEvent[];
+  observedDelays: ObservedDelay[];
+  predictedDelays: PredictedDelay[];
   refreshSnapshot: () => Promise<void>;
 }
 
@@ -174,7 +177,8 @@ export function useRealtimeFeed(): RealtimeFeedModel {
   }, [loadSnapshot]);
 
   const positions = useMemo(() => Object.values(state.positionsByKey), [state.positionsByKey]);
-  const delays = useMemo(() => Object.values(state.delaysByKey), [state.delaysByKey]);
+  const observedDelays = useMemo(() => Object.values(state.observedByKey), [state.observedByKey]);
+  const predictedDelays = useMemo(() => Object.values(state.predictedByKey), [state.predictedByKey]);
 
   return {
     connection,
@@ -184,7 +188,8 @@ export function useRealtimeFeed(): RealtimeFeedModel {
     generatedAt: state.generatedAt,
     lastMessageAt,
     positions,
-    delays,
+    observedDelays,
+    predictedDelays,
     refreshSnapshot
   };
 }

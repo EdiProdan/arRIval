@@ -28,6 +28,7 @@ This plan is full-stack and no-backward-compat by design. V1 delay logic, contra
 - `lin_var_id`
 - `broj_linije`
 - `station_id`
+- `station_name`
 - `station_seq`
 - `scheduled_time`
 - `observed_time`
@@ -41,6 +42,7 @@ This plan is full-stack and no-backward-compat by design. V1 delay logic, contra
 - `lin_var_id`
 - `broj_linije`
 - `station_id`
+- `station_name`
 - `station_seq`
 - `scheduled_time`
 - `predicted_time`
@@ -66,6 +68,21 @@ Exit criteria:
 - Realtime payload shape finalized
 - V1 contract marked for removal
 
+Phase 1 artifacts (contract-first, wiring-neutral):
+- `docs/reference/delay-v2-contract.md` (canonical V2 runtime contract reference)
+- `internal/contracts/delay_v2.go` (`ObservedDelayV2`, `PredictedDelayV2`)
+- `internal/contracts/realtime_v2.go` (`RealtimeSnapshotV2`, V2 websocket payload wrappers)
+- `internal/contracts/topics.go` (V2 topic constants plus deprecated V1 topic constant)
+- `internal/contracts/delay_event.go` + `internal/contracts/realtime.go` marked with `Deprecated:` comments for V1 delay contracts
+- `internal/contracts/delay_v2_test.go` + `internal/contracts/realtime_v2_test.go` for JSON shape and round-trip coverage
+
+Phase 1 completion checklist:
+- No runtime behavior/topic cutover in processor, aggregator, realtime
+- `go test ./...` passes with both V1 and V2 contracts present
+- `go build ./...` passes with V2 contracts available for later phases
+
+**Status:** Completed
+
 ## Phase 2 - Stateful Trip Tracker Engine
 Goal: Build new tracker core that locks trip and tracks forward stop progression with smoothed delay offset.
 
@@ -76,6 +93,8 @@ Exit criteria:
 - Monotonic stop progression (`RedniBrojStanice`) enforced
 - Relock/reset rules implemented for bad lock or stale state
 - Core unit tests passing for normal and failure paths
+
+**Status:** Completed
 
 ## Phase 3 - Processor Cutover to V2 Data Plane
 Goal: Replace current delay matcher in processor and publish only V2 events.
@@ -98,6 +117,8 @@ Exit criteria:
 - Realtime snapshot/ws reflect new observed/predicted split
 - Gold aggregation logic uses observed delays only
 - Service integration tests pass against V2 contracts
+
+**Status:** Completed
 
 ## Phase 5 - UI and Operational Visibility Update
 Goal: Expose V2 semantics in UI and monitoring.

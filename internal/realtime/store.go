@@ -25,8 +25,13 @@ type positionEntry struct {
 	updatedAt time.Time
 }
 
-type delayEntry struct {
-	value     contracts.DelayEvent
+type observedDelayEntry struct {
+	value     contracts.ObservedDelay
+	updatedAt time.Time
+}
+
+type predictedDelayEntry struct {
+	value     contracts.PredictedDelay
 	updatedAt time.Time
 }
 
@@ -36,7 +41,8 @@ type Store struct {
 	delaysTTL    time.Duration
 	now          func() time.Time
 	positions    map[string]positionEntry
-	delays       map[string]delayEntry
+	observed     map[string]observedDelayEntry
+	predicted    map[string]predictedDelayEntry
 }
 
 func NewStore(cfg StoreConfig) *Store {
@@ -60,7 +66,8 @@ func NewStore(cfg StoreConfig) *Store {
 		delaysTTL:    delaysTTL,
 		now:          now,
 		positions:    make(map[string]positionEntry),
-		delays:       make(map[string]delayEntry),
+		observed:     make(map[string]observedDelayEntry),
+		predicted:    make(map[string]predictedDelayEntry),
 	}
 }
 
@@ -82,18 +89,35 @@ func (s *Store) UpsertPositions(positions []contracts.RealtimePosition) {
 	}
 }
 
-func (s *Store) UpsertDelay(event contracts.DelayEvent) {
+func (s *Store) UpsertObservedDelay(event contracts.ObservedDelay) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := delayKey(event.VoznjaBusID, event.StationID)
-	s.delays[key] = delayEntry{
+	key := delayKey(event.TripID, event.StationID)
+	s.observed[key] = observedDelayEntry{
+		value:     event,
+		updatedAt: s.now().UTC(),
+	}
+
+	for predictedKey, entry := range s.predicted {
+		if entry.value.TripID == event.TripID && entry.value.StationSeq <= event.StationSeq {
+			delete(s.predicted, predictedKey)
+		}
+	}
+}
+
+func (s *Store) UpsertPredictedDelay(event contracts.PredictedDelay) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := delayKey(event.TripID, event.StationID)
+	s.predicted[key] = predictedDelayEntry{
 		value:     event,
 		updatedAt: s.now().UTC(),
 	}
 }
 
-func (s *Store) PruneExpired() (int, int) {
+func (s *Store) PruneExpired() (int, int, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -115,38 +139,54 @@ func (s *Store) Snapshot() contracts.RealtimeSnapshot {
 		return positions[i].Key < positions[j].Key
 	})
 
-	delays := make([]contracts.DelayEvent, 0, len(s.delays))
-	for _, entry := range s.delays {
-		delays = append(delays, entry.value)
+	observed := make([]contracts.ObservedDelay, 0, len(s.observed))
+	for _, entry := range s.observed {
+		observed = append(observed, entry.value)
 	}
-	sort.Slice(delays, func(i, j int) bool {
-		if delays[i].VoznjaBusID != delays[j].VoznjaBusID {
-			return delays[i].VoznjaBusID < delays[j].VoznjaBusID
+	sort.Slice(observed, func(i, j int) bool {
+		if observed[i].TripID != observed[j].TripID {
+			return observed[i].TripID < observed[j].TripID
 		}
-		if delays[i].StationID != delays[j].StationID {
-			return delays[i].StationID < delays[j].StationID
+		if observed[i].StationSeq != observed[j].StationSeq {
+			return observed[i].StationSeq < observed[j].StationSeq
 		}
-		return delays[i].ActualTime < delays[j].ActualTime
+		return observed[i].ObservedTime < observed[j].ObservedTime
+	})
+
+	predicted := make([]contracts.PredictedDelay, 0, len(s.predicted))
+	for _, entry := range s.predicted {
+		predicted = append(predicted, entry.value)
+	}
+	sort.Slice(predicted, func(i, j int) bool {
+		if predicted[i].TripID != predicted[j].TripID {
+			return predicted[i].TripID < predicted[j].TripID
+		}
+		if predicted[i].StationSeq != predicted[j].StationSeq {
+			return predicted[i].StationSeq < predicted[j].StationSeq
+		}
+		return predicted[i].GeneratedAt < predicted[j].GeneratedAt
 	})
 
 	return contracts.RealtimeSnapshot{
-		GeneratedAt: now.Format(time.RFC3339Nano),
-		Positions:   positions,
-		Delays:      delays,
+		GeneratedAt:     now.Format(time.RFC3339Nano),
+		Positions:       positions,
+		ObservedDelays:  observed,
+		PredictedDelays: predicted,
 		Meta: contracts.RealtimeSnapshotMeta{
-			PositionsCount: len(positions),
-			DelaysCount:    len(delays),
+			PositionsCount:       len(positions),
+			ObservedDelaysCount:  len(observed),
+			PredictedDelaysCount: len(predicted),
 		},
 	}
 }
 
-func (s *Store) Counts() (int, int) {
+func (s *Store) Counts() (int, int, int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.positions), len(s.delays)
+	return len(s.positions), len(s.observed), len(s.predicted)
 }
 
-func (s *Store) pruneExpiredLocked(now time.Time) (int, int) {
+func (s *Store) pruneExpiredLocked(now time.Time) (int, int, int) {
 	positionsRemoved := 0
 	for key, entry := range s.positions {
 		if now.Sub(entry.updatedAt) > s.positionsTTL {
@@ -155,15 +195,23 @@ func (s *Store) pruneExpiredLocked(now time.Time) (int, int) {
 		}
 	}
 
-	delaysRemoved := 0
-	for key, entry := range s.delays {
+	observedRemoved := 0
+	for key, entry := range s.observed {
 		if now.Sub(entry.updatedAt) > s.delaysTTL {
-			delete(s.delays, key)
-			delaysRemoved++
+			delete(s.observed, key)
+			observedRemoved++
 		}
 	}
 
-	return positionsRemoved, delaysRemoved
+	predictedRemoved := 0
+	for key, entry := range s.predicted {
+		if now.Sub(entry.updatedAt) > s.delaysTTL {
+			delete(s.predicted, key)
+			predictedRemoved++
+		}
+	}
+
+	return positionsRemoved, observedRemoved, predictedRemoved
 }
 
 func positionKey(voznjaBusID, gbr *int64) string {
@@ -176,6 +224,6 @@ func positionKey(voznjaBusID, gbr *int64) string {
 	return "unknown"
 }
 
-func delayKey(voznjaBusID, stationID int64) string {
-	return fmt.Sprintf("%d:%d", voznjaBusID, stationID)
+func delayKey(tripID string, stationID int64) string {
+	return fmt.Sprintf("%s:%d", tripID, stationID)
 }

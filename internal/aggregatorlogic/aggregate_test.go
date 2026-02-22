@@ -8,26 +8,26 @@ import (
 	"github.com/EdiProdan/arRIval/internal/contracts"
 )
 
-func TestConsumeEventInvalidActualTime(t *testing.T) {
+func TestConsumeEventInvalidObservedTime(t *testing.T) {
 	state := make(map[AggregateKey]*AggregateBucket)
-	err := ConsumeEvent(state, contracts.DelayEvent{
+	err := ConsumeEvent(state, contracts.ObservedDelay{
 		BrojLinije:   "2A",
-		ActualTime:   "invalid",
+		ObservedTime: "invalid",
 		DelaySeconds: 10,
 	}, 300)
 	if err == nil {
 		t.Fatalf("ConsumeEvent error = nil, want non-nil")
 	}
-	if !strings.Contains(err.Error(), "parse actual_time") {
-		t.Fatalf("ConsumeEvent error = %q, want parse actual_time", err.Error())
+	if !strings.Contains(err.Error(), "parse observed_time") {
+		t.Fatalf("ConsumeEvent error = %q, want parse observed_time", err.Error())
 	}
 }
 
 func TestConsumeEventBlankRouteFallsBackToUnknown(t *testing.T) {
 	state := make(map[AggregateKey]*AggregateBucket)
-	err := ConsumeEvent(state, contracts.DelayEvent{
+	err := ConsumeEvent(state, contracts.ObservedDelay{
 		BrojLinije:   " ",
-		ActualTime:   "2025-01-02T10:15:00Z",
+		ObservedTime: "2025-01-02T10:15:00Z",
 		DelaySeconds: 120,
 	}, 300)
 	if err != nil {
@@ -49,11 +49,11 @@ func TestConsumeEventBlankRouteFallsBackToUnknown(t *testing.T) {
 
 func TestComputeRowsByDateStats(t *testing.T) {
 	state := make(map[AggregateKey]*AggregateBucket)
-	events := []contracts.DelayEvent{
-		{BrojLinije: "2A", ActualTime: "2025-01-02T10:01:00Z", DelaySeconds: -120},
-		{BrojLinije: "2A", ActualTime: "2025-01-02T10:02:00Z", DelaySeconds: 0},
-		{BrojLinije: "2A", ActualTime: "2025-01-02T10:03:00Z", DelaySeconds: 60},
-		{BrojLinije: "2A", ActualTime: "2025-01-02T10:04:00Z", DelaySeconds: 300},
+	events := []contracts.ObservedDelay{
+		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:01:00Z", DelaySeconds: -120},
+		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:02:00Z", DelaySeconds: 0},
+		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:03:00Z", DelaySeconds: 60},
+		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:04:00Z", DelaySeconds: 300},
 	}
 	for _, event := range events {
 		if err := ConsumeEvent(state, event, 60); err != nil {

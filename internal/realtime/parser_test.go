@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/EdiProdan/arRIval/internal/autotrolej"
+	"github.com/EdiProdan/arRIval/internal/contracts"
 )
 
 func TestParsePositionsRecord(t *testing.T) {
@@ -71,5 +72,70 @@ func TestParsePositionsRecord(t *testing.T) {
 	}
 	if positions[0].ObservedAt != "2026-02-18T10:00:00.123Z" {
 		t.Fatalf("positions[0].ObservedAt = %q, want %q", positions[0].ObservedAt, "2026-02-18T10:00:00.123Z")
+	}
+}
+
+func TestParseObservedDelayRecord(t *testing.T) {
+	payload, err := json.Marshal(contracts.ObservedDelay{
+		TripID:         "trip-121",
+		VoznjaBusID:    121,
+		LinVarID:       "L1A",
+		BrojLinije:     "1",
+		StationID:      1001,
+		StationName:    "Main",
+		StationSeq:     5,
+		ScheduledTime:  "2026-02-18T11:05:00Z",
+		ObservedTime:   "2026-02-18T11:10:00Z",
+		DelaySeconds:   300,
+		DistanceM:      15,
+		TrackerVersion: "current",
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	event, err := ParseObservedDelayRecord(payload)
+	if err != nil {
+		t.Fatalf("ParseObservedDelayRecord error: %v", err)
+	}
+	if event.TripID != "trip-121" || event.StationSeq != 5 || event.DelaySeconds != 300 {
+		t.Fatalf("parsed observed event = %+v, want trip-121 seq=5 delay=300", event)
+	}
+}
+
+func TestParsePredictedDelayRecord(t *testing.T) {
+	payload, err := json.Marshal(contracts.PredictedDelay{
+		TripID:                "trip-121",
+		VoznjaBusID:           121,
+		LinVarID:              "L1A",
+		BrojLinije:            "1",
+		StationID:             1002,
+		StationName:           "Next",
+		StationSeq:            6,
+		ScheduledTime:         "2026-02-18T11:12:00Z",
+		PredictedTime:         "2026-02-18T11:17:00Z",
+		PredictedDelaySeconds: 300,
+		GeneratedAt:           "2026-02-18T11:10:00Z",
+		TrackerVersion:        "current",
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	event, err := ParsePredictedDelayRecord(payload)
+	if err != nil {
+		t.Fatalf("ParsePredictedDelayRecord error: %v", err)
+	}
+	if event.TripID != "trip-121" || event.StationSeq != 6 || event.PredictedDelaySeconds != 300 {
+		t.Fatalf("parsed predicted event = %+v, want trip-121 seq=6 delay=300", event)
+	}
+}
+
+func TestParseObservedAndPredictedDelayRecordInvalidJSON(t *testing.T) {
+	if _, err := ParseObservedDelayRecord([]byte("{")); err == nil {
+		t.Fatalf("ParseObservedDelayRecord error = nil, want non-nil")
+	}
+	if _, err := ParsePredictedDelayRecord([]byte("{")); err == nil {
+		t.Fatalf("ParsePredictedDelayRecord error = nil, want non-nil")
 	}
 }

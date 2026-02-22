@@ -1,0 +1,38 @@
+{
+  "stations": [
+    {"StanicaId": 501, "Naziv": "Capture Stop 1", "Kratki": "CS1", "GpsX": 14.3348, "GpsY": 45.3699},
+    {"StanicaId": 502, "Naziv": "Capture Stop 2", "Kratki": "CS2", "GpsX": 14.3355, "GpsY": 45.3702},
+    {"StanicaId": 503, "Naziv": "Capture Stop 3", "Kratki": "CS3", "GpsX": 14.3362, "GpsY": 45.3706},
+    {"StanicaId": 504, "Naziv": "Capture Stop 4", "Kratki": "CS4", "GpsX": 14.3369, "GpsY": 45.371}
+  ],
+  "line_paths": [
+    {"Id": 1, "LinVarId": "capture-34A", "BrojLinije": "34A", "NazivVarijanteLinije": "Capture Fixture", "Smjer": "A", "StanicaId": 501, "RedniBrojStanice": 1, "Varijanta": "0"},
+    {"Id": 2, "LinVarId": "capture-34A", "BrojLinije": "34A", "NazivVarijanteLinije": "Capture Fixture", "Smjer": "A", "StanicaId": 502, "RedniBrojStanice": 2, "Varijanta": "0"},
+    {"Id": 3, "LinVarId": "capture-34A", "BrojLinije": "34A", "NazivVarijanteLinije": "Capture Fixture", "Smjer": "A", "StanicaId": 503, "RedniBrojStanice": 3, "Varijanta": "0"},
+    {"Id": 4, "LinVarId": "capture-34A", "BrojLinije": "34A", "NazivVarijanteLinije": "Capture Fixture", "Smjer": "A", "StanicaId": 504, "RedniBrojStanice": 4, "Varijanta": "0"}
+  ],
+  "timetable": [
+    {"Id": 1, "PolazakId": "2127350", "StanicaId": 501, "LinVarId": "capture-34A", "Polazak": "12:39:00", "RedniBrojStanice": 1, "BrojLinije": "34A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Capture Fixture", "Naziv": "Capture Stop 1", "GpsX": 14.3348, "GpsY": 45.3699},
+    {"Id": 2, "PolazakId": "2127350", "StanicaId": 502, "LinVarId": "capture-34A", "Polazak": "12:41:00", "RedniBrojStanice": 2, "BrojLinije": "34A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Capture Fixture", "Naziv": "Capture Stop 2", "GpsX": 14.3355, "GpsY": 45.3702},
+    {"Id": 3, "PolazakId": "2127350", "StanicaId": 503, "LinVarId": "capture-34A", "Polazak": "12:43:00", "RedniBrojStanice": 3, "BrojLinije": "34A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Capture Fixture", "Naziv": "Capture Stop 3", "GpsX": 14.3362, "GpsY": 45.3706},
+    {"Id": 4, "PolazakId": "2127350", "StanicaId": 504, "LinVarId": "capture-34A", "Polazak": "12:45:00", "RedniBrojStanice": 4, "BrojLinije": "34A", "Smjer": "A", "Varijanta": "0", "NazivVarijanteLinije": "Capture Fixture", "Naziv": "Capture Stop 4", "GpsX": 14.3369, "GpsY": 45.371}
+  ],
+  "inputs": [
+    {
+      "observed_at": "2026-02-16T12:39:38Z",
+      "bus": {"gbr": 776, "lon": 14.33482, "lat": 45.36991, "voznjaId": 1389890, "voznjaBusId": 2127350}
+    },
+    {
+      "observed_at": "2026-02-16T12:39:48Z",
+      "bus": {"gbr": 776, "lon": 14.33482, "lat": 45.36991, "voznjaId": 1389890, "voznjaBusId": 2127350}
+    },
+    {
+      "observed_at": "2026-02-16T12:41:20Z",
+      "bus": {"gbr": 776, "lon": 14.3355, "lat": 45.3702, "voznjaId": 1389890, "voznjaBusId": 2127350}
+    },
+    {
+      "observed_at": "2026-02-16T12:43:40Z",
+      "bus": {"gbr": 776, "lon": 14.3362, "lat": 45.3706, "voznjaId": 1389890, "voznjaBusId": 2127350}
+    }
+  ]
+}
