@@ -20,8 +20,8 @@ import (
 const (
 	defaultBrokers              = "localhost:19092"
 	defaultPositionsTopic       = "bus-positions-raw"
-	defaultObservedDelaysTopic  = contracts.TopicBusDelayObservedV2
-	defaultPredictedDelaysTopic = contracts.TopicBusDelayPredictedV2
+	defaultObservedDelaysTopic  = contracts.TopicBusDelayObserved
+	defaultPredictedDelaysTopic = contracts.TopicBusDelayPredicted
 	defaultConsumerGroup        = "arrival-realtime"
 	defaultHTTPAddr             = ":8080"
 	defaultMetricsAddr          = ":9104"

@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestObservedDelayV2MarshalOmitsNilGBR(t *testing.T) {
-	event := ObservedDelayV2{
+func TestObservedDelayMarshalOmitsNilGBR(t *testing.T) {
+	event := ObservedDelay{
 		TripID:         "trip-1",
 		VoznjaBusID:    101,
 		LinVarID:       "2A-1",
@@ -19,7 +19,7 @@ func TestObservedDelayV2MarshalOmitsNilGBR(t *testing.T) {
 		ObservedTime:   "2026-02-21T10:16:30Z",
 		DelaySeconds:   270,
 		DistanceM:      28.4,
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	}
 
 	payload, err := json.Marshal(event)
@@ -37,12 +37,12 @@ func TestObservedDelayV2MarshalOmitsNilGBR(t *testing.T) {
 	}
 }
 
-func TestObservedDelayV2RoundTripDelayValues(t *testing.T) {
+func TestObservedDelayRoundTripDelayValues(t *testing.T) {
 	delays := []int64{-120, 0, 540}
 	for _, delaySeconds := range delays {
 		t.Run(fmt.Sprintf("delay_seconds_%d", delaySeconds), func(t *testing.T) {
 			gbr := int64(77)
-			in := ObservedDelayV2{
+			in := ObservedDelay{
 				TripID:         "trip-2",
 				VoznjaBusID:    202,
 				GBR:            &gbr,
@@ -55,7 +55,7 @@ func TestObservedDelayV2RoundTripDelayValues(t *testing.T) {
 				ObservedTime:   "2026-02-21T11:00:00Z",
 				DelaySeconds:   delaySeconds,
 				DistanceM:      34.1,
-				TrackerVersion: "v2",
+				TrackerVersion: "current",
 			}
 
 			payload, err := json.Marshal(in)
@@ -63,7 +63,7 @@ func TestObservedDelayV2RoundTripDelayValues(t *testing.T) {
 				t.Fatalf("marshal observed delay: %v", err)
 			}
 
-			var out ObservedDelayV2
+			var out ObservedDelay
 			if err := json.Unmarshal(payload, &out); err != nil {
 				t.Fatalf("unmarshal observed delay: %v", err)
 			}
@@ -78,8 +78,8 @@ func TestObservedDelayV2RoundTripDelayValues(t *testing.T) {
 	}
 }
 
-func TestPredictedDelayV2RoundTrip(t *testing.T) {
-	in := PredictedDelayV2{
+func TestPredictedDelayRoundTrip(t *testing.T) {
+	in := PredictedDelay{
 		TripID:                "trip-3",
 		VoznjaBusID:           303,
 		LinVarID:              "6-1",
@@ -91,7 +91,7 @@ func TestPredictedDelayV2RoundTrip(t *testing.T) {
 		PredictedTime:         "2026-02-21T12:13:20Z",
 		PredictedDelaySeconds: 200,
 		GeneratedAt:           "2026-02-21T12:00:00Z",
-		TrackerVersion:        "v2",
+		TrackerVersion:        "current",
 	}
 
 	payload, err := json.Marshal(in)
@@ -99,7 +99,7 @@ func TestPredictedDelayV2RoundTrip(t *testing.T) {
 		t.Fatalf("marshal predicted delay: %v", err)
 	}
 
-	var out PredictedDelayV2
+	var out PredictedDelay
 	if err := json.Unmarshal(payload, &out); err != nil {
 		t.Fatalf("unmarshal predicted delay: %v", err)
 	}

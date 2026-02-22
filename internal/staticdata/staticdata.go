@@ -49,12 +49,12 @@ type stationLineKey struct {
 }
 
 type Store struct {
-	Stations              []Station
-	LinePaths             []LinePathRow
-	TimetableStops        []TimetableStopRow
-	StationsByID          map[int]Station
+	Stations               []Station
+	LinePaths              []LinePathRow
+	TimetableStops         []TimetableStopRow
+	StationsByID           map[int]Station
 	LinePathsByLinVar      map[string][]LinePathRow
-	TimetableByPolazak    map[string][]TimetableStopRow
+	TimetableByPolazak     map[string][]TimetableStopRow
 	TimetableByStationLine map[stationLineKey][]TimetableStopRow
 }
 
@@ -79,12 +79,12 @@ func LoadFromDir(dir string) (*Store, error) {
 	}
 
 	store := &Store{
-		Stations:              stations,
-		LinePaths:             linePaths,
-		TimetableStops:        timetableStops,
-		StationsByID:          make(map[int]Station, len(stations)),
+		Stations:               stations,
+		LinePaths:              linePaths,
+		TimetableStops:         timetableStops,
+		StationsByID:           make(map[int]Station, len(stations)),
 		LinePathsByLinVar:      make(map[string][]LinePathRow),
-		TimetableByPolazak:    make(map[string][]TimetableStopRow),
+		TimetableByPolazak:     make(map[string][]TimetableStopRow),
 		TimetableByStationLine: make(map[stationLineKey][]TimetableStopRow),
 	}
 

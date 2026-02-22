@@ -61,10 +61,10 @@ func TestServerSnapshotEmptyAndPopulated(t *testing.T) {
 	if err := server.HandlePositionsRecord("bus-positions-raw", mustPositionsPayload(t), observedAt); err != nil {
 		t.Fatalf("HandlePositionsRecord: %v", err)
 	}
-	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 5), observedAt); err != nil {
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted", mustPredictedPayload(t, 5), observedAt); err != nil {
 		t.Fatalf("HandlePredictedDelayRecord: %v", err)
 	}
-	if err := server.HandleObservedDelayRecord("bus-delay-observed-v2", mustObservedPayload(t, 5), observedAt); err != nil {
+	if err := server.HandleObservedDelayRecord("bus-delay-observed", mustObservedPayload(t, 5), observedAt); err != nil {
 		t.Fatalf("HandleObservedDelayRecord: %v", err)
 	}
 
@@ -112,10 +112,10 @@ func TestServerWebsocketReceivesUpdatesAndHeartbeat(t *testing.T) {
 	if err := server.HandlePositionsRecord("bus-positions-raw", mustPositionsPayload(t), observedAt); err != nil {
 		t.Fatalf("HandlePositionsRecord: %v", err)
 	}
-	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 6), observedAt); err != nil {
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted", mustPredictedPayload(t, 6), observedAt); err != nil {
 		t.Fatalf("HandlePredictedDelayRecord: %v", err)
 	}
-	if err := server.HandleObservedDelayRecord("bus-delay-observed-v2", mustObservedPayload(t, 5), observedAt); err != nil {
+	if err := server.HandleObservedDelayRecord("bus-delay-observed", mustObservedPayload(t, 5), observedAt); err != nil {
 		t.Fatalf("HandleObservedDelayRecord: %v", err)
 	}
 
@@ -138,9 +138,9 @@ func TestServerWebsocketReceivesUpdatesAndHeartbeat(t *testing.T) {
 		switch envelope.Type {
 		case "positions_batch":
 			foundPositions = true
-		case contracts.RealtimeEventDelayObservedUpdateV2:
+		case contracts.RealtimeEventDelayObservedUpdate:
 			foundObserved = true
-		case contracts.RealtimeEventDelayPredictionUpdateV2:
+		case contracts.RealtimeEventDelayPredictionUpdate:
 			foundPredicted = true
 		case "heartbeat":
 			foundHeartbeat = true
@@ -172,16 +172,16 @@ func TestServerSnapshotObservedSupersedesProgressedPredictions(t *testing.T) {
 	defer httpServer.Close()
 
 	observedAt := time.Date(2026, 2, 18, 11, 20, 0, 0, time.UTC)
-	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 4), observedAt); err != nil {
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted", mustPredictedPayload(t, 4), observedAt); err != nil {
 		t.Fatalf("HandlePredictedDelayRecord seq=4: %v", err)
 	}
-	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 5), observedAt); err != nil {
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted", mustPredictedPayload(t, 5), observedAt); err != nil {
 		t.Fatalf("HandlePredictedDelayRecord seq=5: %v", err)
 	}
-	if err := server.HandlePredictedDelayRecord("bus-delay-predicted-v2", mustPredictedPayload(t, 6), observedAt); err != nil {
+	if err := server.HandlePredictedDelayRecord("bus-delay-predicted", mustPredictedPayload(t, 6), observedAt); err != nil {
 		t.Fatalf("HandlePredictedDelayRecord seq=6: %v", err)
 	}
-	if err := server.HandleObservedDelayRecord("bus-delay-observed-v2", mustObservedPayload(t, 5), observedAt); err != nil {
+	if err := server.HandleObservedDelayRecord("bus-delay-observed", mustObservedPayload(t, 5), observedAt); err != nil {
 		t.Fatalf("HandleObservedDelayRecord seq=5: %v", err)
 	}
 
@@ -236,7 +236,7 @@ func getStatusCode(t *testing.T, url string) int {
 	return resp.StatusCode
 }
 
-func getSnapshot(t *testing.T, url string) contracts.RealtimeSnapshotV2 {
+func getSnapshot(t *testing.T, url string) contracts.RealtimeSnapshot {
 	t.Helper()
 	resp, err := http.Get(url)
 	if err != nil {
@@ -249,7 +249,7 @@ func getSnapshot(t *testing.T, url string) contracts.RealtimeSnapshotV2 {
 		t.Fatalf("read body: %v", err)
 	}
 
-	var snapshot contracts.RealtimeSnapshotV2
+	var snapshot contracts.RealtimeSnapshot
 	if err := json.Unmarshal(body, &snapshot); err != nil {
 		t.Fatalf("unmarshal snapshot: %v body=%s", err, string(body))
 	}
@@ -283,7 +283,7 @@ func mustPositionsPayload(t *testing.T) []byte {
 
 func mustObservedPayload(t *testing.T, stationSeq int64) []byte {
 	t.Helper()
-	payload, err := json.Marshal(contracts.ObservedDelayV2{
+	payload, err := json.Marshal(contracts.ObservedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      1000 + stationSeq,
@@ -295,7 +295,7 @@ func mustObservedPayload(t *testing.T, stationSeq int64) []byte {
 		ScheduledTime:  "2026-02-18T11:05:00Z",
 		ObservedTime:   "2026-02-18T11:10:00Z",
 		DelaySeconds:   300,
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
 	if err != nil {
 		t.Fatalf("marshal observed payload: %v", err)
@@ -305,7 +305,7 @@ func mustObservedPayload(t *testing.T, stationSeq int64) []byte {
 
 func mustPredictedPayload(t *testing.T, stationSeq int64) []byte {
 	t.Helper()
-	payload, err := json.Marshal(contracts.PredictedDelayV2{
+	payload, err := json.Marshal(contracts.PredictedDelay{
 		TripID:                "trip-121",
 		VoznjaBusID:           121,
 		StationID:             1000 + stationSeq,
@@ -317,7 +317,7 @@ func mustPredictedPayload(t *testing.T, stationSeq int64) []byte {
 		PredictedTime:         "2026-02-18T11:10:00Z",
 		PredictedDelaySeconds: 300,
 		GeneratedAt:           "2026-02-18T11:00:00Z",
-		TrackerVersion:        "v2",
+		TrackerVersion:        "current",
 	})
 	if err != nil {
 		t.Fatalf("marshal predicted payload: %v", err)

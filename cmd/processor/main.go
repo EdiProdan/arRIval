@@ -30,8 +30,8 @@ import (
 const (
 	defaultBrokers              = "localhost:19092"
 	defaultInputTopic           = "bus-positions-raw"
-	defaultObservedOutputTopic  = contracts.TopicBusDelayObservedV2
-	defaultPredictedOutputTopic = contracts.TopicBusDelayPredictedV2
+	defaultObservedOutputTopic  = contracts.TopicBusDelayObserved
+	defaultPredictedOutputTopic = contracts.TopicBusDelayPredicted
 	defaultConsumerGroup        = "arrival-processor-bronze"
 	defaultBronzeDir            = "data/bronze"
 	defaultSilverDir            = "data/silver"
@@ -41,8 +41,8 @@ const (
 )
 
 const (
-	observedSilverFilename  = "observed_delays_v2.parquet"
-	predictedSilverFilename = "predicted_delays_v2.parquet"
+	observedSilverFilename  = "observed_delays.parquet"
+	predictedSilverFilename = "predicted_delays.parquet"
 	createTopicTimeout      = 15 * time.Second
 	createTopicPartitions   = 1
 	createTopicReplicas     = 1
@@ -89,7 +89,7 @@ type bronzeDailyWriter struct {
 	rowsWritten int64
 }
 
-type silverObservedDelayV2Row struct {
+type silverObservedDelayRow struct {
 	IngestedAt     string  `parquet:"name=ingested_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	IngestedDate   string  `parquet:"name=ingested_date, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	TripID         string  `parquet:"name=trip_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
@@ -110,7 +110,7 @@ type silverObservedDelayV2Row struct {
 	KafkaOffset    int64   `parquet:"name=kafka_offset, type=INT64"`
 }
 
-type silverPredictedDelayV2Row struct {
+type silverPredictedDelayRow struct {
 	IngestedAt            string `parquet:"name=ingested_at, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	IngestedDate          string `parquet:"name=ingested_date, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	TripID                string `parquet:"name=trip_id, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
@@ -151,15 +151,15 @@ type bronzeWriter interface {
 }
 
 type observedWriter interface {
-	Write(row silverObservedDelayV2Row) error
+	Write(row silverObservedDelayRow) error
 }
 
 type predictedWriter interface {
-	Write(row silverPredictedDelayV2Row) error
+	Write(row silverPredictedDelayRow) error
 }
 
 type tracker interface {
-	Track(input processorlogic.V2TrackInput) processorlogic.V2TrackOutput
+	Track(input processorlogic.TrackInput) processorlogic.TrackOutput
 }
 
 type publishFunc func(ctx context.Context, record *kgo.Record) error
@@ -194,7 +194,7 @@ func main() {
 		log.Fatalf("load static data: %v", err)
 	}
 
-	statefulTracker := processorlogic.NewV2Tracker(store, processorlogic.V2TrackerConfig{
+	statefulTracker := processorlogic.NewTracker(store, processorlogic.TrackerConfig{
 		StationMatchMeters: stationMatchMeters,
 		ServiceLocation:    serviceLocation,
 	})
@@ -351,18 +351,18 @@ func processRecord(
 			return false, published, err
 		}
 
-		out := track.Track(processorlogic.V2TrackInput{
+		out := track.Track(processorlogic.TrackInput{
 			ObservedAt:     observedAt,
 			KafkaTopic:     rec.Topic,
 			KafkaPartition: rec.Partition,
 			KafkaOffset:    rec.Offset,
 			Bus:            bus,
 		})
-		if out.SkipReason != processorlogic.V2SkipReasonNone {
+		if out.SkipReason != processorlogic.SkipReasonNone {
 			reason := string(out.SkipReason)
 			collector.trackerSkips.WithLabelValues(reason).Inc()
 			log.Printf(
-				"status=skip stage=v2_track reason=%s partition=%d offset=%d voznja_bus_id=%v",
+				"status=skip stage=track reason=%s partition=%d offset=%d voznja_bus_id=%v",
 				reason,
 				rec.Partition,
 				rec.Offset,
@@ -372,7 +372,7 @@ func processRecord(
 		}
 
 		for _, event := range out.Observed {
-			silverRow := silverObservedDelayV2Row{
+			silverRow := silverObservedDelayRow{
 				IngestedAt:     row.IngestedAt,
 				IngestedDate:   row.IngestedDate,
 				TripID:         event.TripID,
@@ -398,12 +398,12 @@ func processRecord(
 
 			payloadBytes, err := json.Marshal(event)
 			if err != nil {
-				return false, published, fmt.Errorf("marshal observed delay v2 event: %w", err)
+				return false, published, fmt.Errorf("marshal observed delay event: %w", err)
 			}
 
 			key := fmt.Sprintf("%d:%d:%d:%d", event.VoznjaBusID, event.StationID, rec.Partition, rec.Offset)
 			if err := publish(ctx, &kgo.Record{Topic: observedTopic, Key: []byte(key), Value: payloadBytes}); err != nil {
-				return false, published, fmt.Errorf("publish observed delay v2 event: %w", err)
+				return false, published, fmt.Errorf("publish observed delay event: %w", err)
 			}
 
 			collector.observedDelaySeconds.Observe(float64(event.DelaySeconds))
@@ -420,7 +420,7 @@ func processRecord(
 		}
 
 		for _, event := range out.Predicted {
-			silverRow := silverPredictedDelayV2Row{
+			silverRow := silverPredictedDelayRow{
 				IngestedAt:            row.IngestedAt,
 				IngestedDate:          row.IngestedDate,
 				TripID:                event.TripID,
@@ -445,12 +445,12 @@ func processRecord(
 
 			payloadBytes, err := json.Marshal(event)
 			if err != nil {
-				return false, published, fmt.Errorf("marshal predicted delay v2 event: %w", err)
+				return false, published, fmt.Errorf("marshal predicted delay event: %w", err)
 			}
 
 			key := fmt.Sprintf("%d:%d:%d:%d", event.VoznjaBusID, event.StationID, rec.Partition, rec.Offset)
 			if err := publish(ctx, &kgo.Record{Topic: predictedTopic, Key: []byte(key), Value: payloadBytes}); err != nil {
-				return false, published, fmt.Errorf("publish predicted delay v2 event: %w", err)
+				return false, published, fmt.Errorf("publish predicted delay event: %w", err)
 			}
 
 			collector.predictedDelaySeconds.Observe(float64(event.PredictedDelaySeconds))
@@ -530,29 +530,29 @@ func newProcessorMetrics() processorMetrics {
 
 	observedDelaySeconds := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    "arrival_processor_observed_delay_seconds",
-		Help:    "Distribution of observed V2 bus delay values in seconds.",
+		Help:    "Distribution of observed bus delay values in seconds.",
 		Buckets: []float64{-1800, -900, -300, -120, -60, -30, 0, 30, 60, 120, 300, 600, 900, 1800, 3600},
 	})
 
 	predictedDelaySeconds := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    "arrival_processor_predicted_delay_seconds",
-		Help:    "Distribution of predicted V2 bus delay values in seconds.",
+		Help:    "Distribution of predicted bus delay values in seconds.",
 		Buckets: []float64{-1800, -900, -300, -120, -60, -30, 0, 30, 60, 120, 300, 600, 900, 1800, 3600},
 	})
 
 	observedPublished := prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "arrival_processor_observed_events_published_total",
-		Help: "Total number of observed V2 delay events published.",
+		Help: "Total number of observed delay events published.",
 	})
 
 	predictedPublished := prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "arrival_processor_predicted_events_published_total",
-		Help: "Total number of predicted V2 delay events published.",
+		Help: "Total number of predicted delay events published.",
 	})
 
 	trackerSkips := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "arrival_processor_tracker_skips_total",
-		Help: "Total number of V2 tracker skips grouped by skip reason.",
+		Help: "Total number of tracker skips grouped by skip reason.",
 	}, []string{"reason"})
 
 	prometheus.MustRegister(
@@ -644,7 +644,7 @@ func (bw *bronzeDailyWriter) Close() error {
 	return nil
 }
 
-func (sw *silverObservedDailyWriter) Write(row silverObservedDelayV2Row) error {
+func (sw *silverObservedDailyWriter) Write(row silverObservedDelayRow) error {
 	if err := sw.ensureDate(row.IngestedDate); err != nil {
 		return err
 	}
@@ -677,7 +677,7 @@ func (sw *silverObservedDailyWriter) ensureDate(date string) error {
 		return fmt.Errorf("open observed silver parquet file writer %s: %w", filePath, err)
 	}
 
-	pw, err := writer.NewParquetWriter(fw, new(silverObservedDelayV2Row), 1)
+	pw, err := writer.NewParquetWriter(fw, new(silverObservedDelayRow), 1)
 	if err != nil {
 		_ = fw.Close()
 		return fmt.Errorf("create observed silver parquet writer %s: %w", filePath, err)
@@ -708,7 +708,7 @@ func (sw *silverObservedDailyWriter) Close() error {
 	return nil
 }
 
-func (sw *silverPredictedDailyWriter) Write(row silverPredictedDelayV2Row) error {
+func (sw *silverPredictedDailyWriter) Write(row silverPredictedDelayRow) error {
 	if err := sw.ensureDate(row.IngestedDate); err != nil {
 		return err
 	}
@@ -741,7 +741,7 @@ func (sw *silverPredictedDailyWriter) ensureDate(date string) error {
 		return fmt.Errorf("open predicted silver parquet file writer %s: %w", filePath, err)
 	}
 
-	pw, err := writer.NewParquetWriter(fw, new(silverPredictedDelayV2Row), 1)
+	pw, err := writer.NewParquetWriter(fw, new(silverPredictedDelayRow), 1)
 	if err != nil {
 		_ = fw.Close()
 		return fmt.Errorf("create predicted silver parquet writer %s: %w", filePath, err)

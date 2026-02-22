@@ -1,31 +1,29 @@
-# Reference: Delay V2 Contract
+# Reference: Delay Contract
 
-This page defines the active V2 delay contracts after cutover.
+This page defines the active delay contracts used by runtime services.
 
-Status on **February 21, 2026**:
-- V2 contracts are finalized in docs and `internal/contracts`.
-- Runtime services use V2 observed/predicted topics and V2 realtime payloads.
+Status on **February 22, 2026**:
+- `processor` emits observed and predicted delay events.
+- `aggregator` consumes observed delay events.
+- `realtime` consumes observed and predicted delay events.
 
-## Kafka Topics
-
-### Active V2 topics (new)
+## Kafka topics
 
 | Topic | Purpose |
 |---|---|
-| `bus-delay-observed-v2` | Observed stop-level delay events |
-| `bus-delay-predicted-v2` | Predicted stop-level delay/ETA events |
+| `bus-delay-observed` | Observed stop-level delay events |
+| `bus-delay-predicted` | Predicted stop-level delay/ETA events |
 
-### Legacy topic (deprecated)
+Go constants:
+- `internal/contracts/topics.go`
+- `TopicBusDelayObserved`
+- `TopicBusDelayPredicted`
 
-| Topic | Status |
-|---|---|
-| `bus-delays` | V1 only. Deprecated and scheduled for removal. |
+## Event contracts
 
-## Event Contracts
+### `ObservedDelay`
 
-### `ObservedDelayV2`
-
-Go type: `internal/contracts/delay_v2.go` (`ObservedDelayV2`)
+Go type: `internal/contracts/delay.go` (`ObservedDelay`)
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -41,11 +39,11 @@ Go type: `internal/contracts/delay_v2.go` (`ObservedDelayV2`)
 | `observed_time` | string | yes | RFC3339 UTC observed timestamp |
 | `delay_seconds` | int64 | yes | Signed observed delay |
 | `distance_m` | float64 | yes | Vehicle-to-stop match distance |
-| `tracker_version` | string | yes | Tracker version marker (for example `v2`) |
+| `tracker_version` | string | yes | Tracker build/version marker (default currently `current`) |
 
-### `PredictedDelayV2`
+### `PredictedDelay`
 
-Go type: `internal/contracts/delay_v2.go` (`PredictedDelayV2`)
+Go type: `internal/contracts/delay.go` (`PredictedDelay`)
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -60,16 +58,17 @@ Go type: `internal/contracts/delay_v2.go` (`PredictedDelayV2`)
 | `predicted_time` | string | yes | RFC3339 UTC predicted timestamp |
 | `predicted_delay_seconds` | int64 | yes | Signed predicted delay |
 | `generated_at` | string | yes | RFC3339 UTC prediction generation timestamp |
-| `tracker_version` | string | yes | Tracker version marker (for example `v2`) |
+| `tracker_version` | string | yes | Tracker build/version marker (default currently `current`) |
 
-## Realtime API V2 Payload Contract
+## Realtime API payload contract
 
-V2 keeps `/v1/snapshot` and `/v1/ws` paths, but changes delay payload shape.
+Realtime keeps `/v1/snapshot` and `/v1/ws` paths.
 
-### Snapshot payload (`/v1/snapshot`)
+### Snapshot (`/v1/snapshot`)
 
-Go type: `internal/contracts/realtime_v2.go` (`RealtimeSnapshotV2`)
+Go type: `internal/contracts/realtime.go` (`RealtimeSnapshot`)
 
+Top-level fields:
 - `generated_at`
 - `positions`
 - `observed_delays`
@@ -78,11 +77,11 @@ Go type: `internal/contracts/realtime_v2.go` (`RealtimeSnapshotV2`)
 - `meta.observed_delays_count`
 - `meta.predicted_delays_count`
 
-Realtime state precedence rule:
-- Observed delays are authoritative for progressed stops.
-- On observed upsert, predicted entries for the same `trip_id` with `station_seq <= observed.station_seq` are removed from snapshot state.
+State precedence:
+- observed delay is authoritative for progressed stops
+- when observed delay is upserted, predicted entries for the same `trip_id` and `station_seq <= observed.station_seq` are removed
 
-### Websocket payloads (`/v1/ws`)
+### Websocket (`/v1/ws`)
 
 Envelope type values:
 - `delay_observed_update`
@@ -91,10 +90,3 @@ Envelope type values:
 Payload wrappers:
 - `RealtimeObservedDelayUpdate` with key `observed_delay`
 - `RealtimePredictedDelayUpdate` with key `predicted_delay`
-
-## V1 Deprecation Notice
-
-The following V1 contracts remain only as deprecated code artifacts until final cleanup:
-- Topic constant `TopicBusDelaysV1`
-- Event type `DelayEvent` (`internal/contracts/delay_event.go`)
-- Legacy snapshot/ws contract types in `internal/contracts/realtime.go`

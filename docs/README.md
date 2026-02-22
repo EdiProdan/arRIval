@@ -29,7 +29,7 @@ The structure follows the Diátaxis framework:
 ## Reference
 
 - [`reference/data-schema.md`](reference/data-schema.md)
-- [`reference/delay-v2-contract.md`](reference/delay-v2-contract.md)
+- [`reference/delay-contract.md`](reference/delay-contract.md)
 - [`reference/api/openapi-preview.json`](reference/api/openapi-preview.json)
 - [`reference/architecture/current-system.md`](reference/architecture/current-system.md)
 - [`reference/architecture/current-architecture.mmd`](reference/architecture/current-architecture.mmd)
@@ -37,12 +37,17 @@ The structure follows the Diátaxis framework:
 
 ## Explanation
 
+- [`explanation/delay.md`](explanation/delay.md)
 - [`explanation/architecture-overview.md`](explanation/architecture-overview.md)
 - [`explanation/design-decisions.md`](explanation/design-decisions.md)
-- [`explanation/mvp-implementation-history.md`](explanation/mvp-implementation-history.md)
-- [`explanation/v1-implementation-history.md`](explanation/v1-implementation-history.md)
-- [`explanation/v2-implementation-plan.md`](explanation/v2-implementation-plan.md)
 - [`explanation/architecture-simplified.mmd`](explanation/architecture-simplified.mmd)
+
+## Archive
+
+- [`archive/explanation/delay-legacy.md`](archive/explanation/delay-legacy.md)
+- [`archive/explanation/mvp-implementation-history.md`](archive/explanation/mvp-implementation-history.md)
+- [`archive/explanation/v1-implementation-history.md`](archive/explanation/v1-implementation-history.md)
+- [`archive/explanation/v2-implementation-plan.md`](archive/explanation/v2-implementation-plan.md)
 
 ## Documentation maintenance
 

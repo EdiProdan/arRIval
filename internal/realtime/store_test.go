@@ -60,23 +60,23 @@ func TestStorePruneExpired(t *testing.T) {
 			ObservedAt: now.Format(time.RFC3339Nano),
 		},
 	})
-	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+	store.UpsertObservedDelay(contracts.ObservedDelay{
 		TripID:         "trip-7",
 		VoznjaBusID:    7,
 		StationID:      100,
 		StationSeq:     1,
 		ObservedTime:   now.Format(time.RFC3339Nano),
 		DelaySeconds:   30,
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:                "trip-7",
 		VoznjaBusID:           7,
 		StationID:             101,
 		StationSeq:            2,
 		PredictedDelaySeconds: 45,
 		GeneratedAt:           now.Format(time.RFC3339Nano),
-		TrackerVersion:        "v2",
+		TrackerVersion:        "current",
 	})
 
 	now = now.Add(90 * time.Second)
@@ -119,37 +119,37 @@ func TestStoreSnapshotDeterministicOrderAndCounts(t *testing.T) {
 		},
 	})
 
-	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+	store.UpsertObservedDelay(contracts.ObservedDelay{
 		TripID:         "trip-2",
 		VoznjaBusID:    2,
 		StationID:      20,
 		StationSeq:     2,
 		ObservedTime:   "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+	store.UpsertObservedDelay(contracts.ObservedDelay{
 		TripID:         "trip-1",
 		VoznjaBusID:    1,
 		StationID:      10,
 		StationSeq:     1,
 		ObservedTime:   "2026-02-18T10:01:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-2",
 		VoznjaBusID:    2,
 		StationID:      30,
 		StationSeq:     3,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-1",
 		VoznjaBusID:    1,
 		StationID:      20,
 		StationSeq:     2,
 		GeneratedAt:    "2026-02-18T10:01:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
 
 	snapshot := store.Snapshot()
@@ -178,21 +178,21 @@ func TestStoreObservedUpsertRemovesMatchingPredictedStop(t *testing.T) {
 		Now: func() time.Time { return now },
 	})
 
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      5,
 		StationSeq:     5,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+	store.UpsertObservedDelay(contracts.ObservedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      5,
 		StationSeq:     5,
 		ObservedTime:   "2026-02-18T10:02:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
 
 	snapshot := store.Snapshot()
@@ -210,54 +210,54 @@ func TestStoreObservedUpsertRemovesProgressedPredictions(t *testing.T) {
 		Now: func() time.Time { return now },
 	})
 
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      30,
 		StationSeq:     3,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      40,
 		StationSeq:     4,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      50,
 		StationSeq:     5,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      60,
 		StationSeq:     6,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
-	store.UpsertPredictedDelay(contracts.PredictedDelayV2{
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
 		TripID:         "trip-999",
 		VoznjaBusID:    999,
 		StationID:      40,
 		StationSeq:     4,
 		GeneratedAt:    "2026-02-18T10:00:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
 
-	store.UpsertObservedDelay(contracts.ObservedDelayV2{
+	store.UpsertObservedDelay(contracts.ObservedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		StationID:      50,
 		StationSeq:     5,
 		ObservedTime:   "2026-02-18T10:02:00Z",
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
 
 	snapshot := store.Snapshot()

@@ -1,60 +1,46 @@
-## **Bus Delay Tracker - High Level Architecture**
+## Bus Delay Tracker Architecture Overview
 
-### **Stack**
-- **Go** - everything in Go, keep it simple
-- **Redpanda** - single broker is fine
-- **Parquet** - store in local filesystem (medallion layers)
-- **Prometheus + Grafana** - observability
+### Stack
+- Go services and CLIs
+- Redpanda (single broker in local compose)
+- Parquet medallion outputs on local filesystem
+- Prometheus + Grafana observability
 
-### **Data Flow**
+### Current data flow
 
-```
-API Poller → Redpanda → Processor → Parquet (Bronze/Silver/Gold)
-                ↓
-          Prometheus metrics → Grafana dashboard
-```
-
-### **3 Simple Services**
-
-**1. Ingester Service** (`cmd/ingester`)
-- Poll `/autobusi` every 30 seconds
-- Push raw JSON to Redpanda topic `bus-positions-raw`
-- Expose metrics: API latency, poll count, errors
-- That's it
-
-**2. Processor Service** (`cmd/processor`)
-- Consume from `bus-positions-raw`
-- **Bronze**: Write raw events to `data/bronze/YYYY-MM-DD/positions.parquet`
-- **Silver**: Match bus position to nearest station, calculate if early/late based on schedule
-- Write to `data/silver/YYYY-MM-DD/delays.parquet` 
-- Emit to Redpanda topic `bus-delays`
-- Metrics: processing lag, delay distribution
-
-**3. Aggregator Service** (`cmd/aggregator`)
-- Consume from `bus-delays`
-- **Gold**: Calculate hourly stats per route (avg delay, p95, p99)
-- Write to `data/gold/YYYY-MM-DD/stats.parquet`
-- Metrics: aggregation lag
-
-### **Observability (Minimal Step 8)**
-- Prometheus and Grafana run in Docker Compose
-- Ingester, processor, and aggregator also run in Docker Compose and expose `/metrics` on the internal network
-- Grafana auto-loads one provisioned dashboard: `arRIval - Minimal Operations`
-- Panels: live poll health, delay distribution, system lag, and busiest/worst **proxy** panel
-- Note: true per-route “worst/busiest” ranking is not exposed yet via Prometheus labels
-
-### **Delay Calculation (Keep it Stupid)**
-```
-1. Get bus position (lat/lon)
-2. Find nearest station (haversine distance < 100m)
-3. Check schedule: "should bus X be at station Y at time T?"
-4. If yes → delay = actual_time - scheduled_time
-5. If no → ignore (bus between stops)
+```text
+API Poller -> Redpanda -> Processor -> Parquet (Bronze/Silver)
+                                |-> observed topic -> Aggregator -> Gold
+                                |-> observed/predicted topics -> Realtime API/WS
 ```
 
-### **Scope Cuts** (keep it minimal)
-- No database - just Parquet files
-- No web UI - just Grafana dashboards
-- No backfilling - only live data
-- No schema registry - just JSON
-- Static schedule data (load once on startup)
+### Services
+
+1. `cmd/ingester`
+- polls `/autobusi` every 30 seconds
+- publishes raw envelopes to `bus-positions-raw`
+
+2. `cmd/processor`
+- consumes `bus-positions-raw`
+- writes Bronze rows to `data/bronze/YYYY-MM-DD/positions.parquet`
+- runs stateful tracker
+- writes Silver rows to:
+  - `data/silver/YYYY-MM-DD/observed_delays.parquet`
+  - `data/silver/YYYY-MM-DD/predicted_delays.parquet`
+- publishes delay events to:
+  - `bus-delay-observed`
+  - `bus-delay-predicted`
+
+3. `cmd/aggregator`
+- consumes `bus-delay-observed`
+- computes hourly route stats
+- writes `data/gold/YYYY-MM-DD/stats.parquet`
+
+4. `cmd/realtime`
+- consumes `bus-positions-raw`, `bus-delay-observed`, `bus-delay-predicted`
+- serves `GET /v1/snapshot` and `GET /v1/ws`
+
+### Operational notes
+- static data is downloaded by `cmd/staticsync` into `data/*.json`
+- `tracker_version` stays in payloads as runtime metadata (default `current`)
+- old `*-v2` topics/files are cleaned up operationally, not automatically

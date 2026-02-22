@@ -9,7 +9,7 @@ import (
 
 const secondsPerDay = int64(24 * 60 * 60)
 
-type v2TripStop struct {
+type tripStop struct {
 	TripID                    string
 	StationID                 int64
 	StationName               string
@@ -24,14 +24,14 @@ type v2TripStop struct {
 	HasCoordinates            bool
 }
 
-type v2TripPlan struct {
+type tripPlan struct {
 	TripID     string
-	Stops      []v2TripStop
+	Stops      []tripStop
 	indexBySeq map[int64]int
 }
 
-func buildV2TripPlans(store *staticdata.Store) map[string]*v2TripPlan {
-	plans := make(map[string]*v2TripPlan)
+func buildTripPlans(store *staticdata.Store) map[string]*tripPlan {
+	plans := make(map[string]*tripPlan)
 	if store == nil {
 		return plans
 	}
@@ -42,7 +42,7 @@ func buildV2TripPlans(store *staticdata.Store) map[string]*v2TripPlan {
 			continue
 		}
 
-		stopsBySeq := make(map[int64]v2TripStop)
+		stopsBySeq := make(map[int64]tripStop)
 		for _, row := range rows {
 			seq := int64(row.RedniBrojStanice)
 			if seq <= 0 {
@@ -54,7 +54,7 @@ func buildV2TripPlans(store *staticdata.Store) map[string]*v2TripPlan {
 				continue
 			}
 
-			stop := v2TripStop{
+			stop := tripStop{
 				TripID:               tripID,
 				StationID:            int64(row.StanicaID),
 				StationName:          stationNameFromRow(row, store),
@@ -65,7 +65,7 @@ func buildV2TripPlans(store *staticdata.Store) map[string]*v2TripPlan {
 				ScheduleSecondsOfDay: secondsOfDay,
 			}
 
-			stop.Lon, stop.Lat, stop.HasCoordinates = resolveV2StopCoordinates(row, store)
+			stop.Lon, stop.Lat, stop.HasCoordinates = resolveStopCoordinates(row, store)
 
 			existing, exists := stopsBySeq[seq]
 			if !exists || (!existing.HasCoordinates && stop.HasCoordinates) {
@@ -83,7 +83,7 @@ func buildV2TripPlans(store *staticdata.Store) map[string]*v2TripPlan {
 		}
 		sortInt64s(seqs)
 
-		stops := make([]v2TripStop, 0, len(seqs))
+		stops := make([]tripStop, 0, len(seqs))
 		var (
 			dayOffset int64
 			prevSec   int64
@@ -103,7 +103,7 @@ func buildV2TripPlans(store *staticdata.Store) map[string]*v2TripPlan {
 			indexBySeq[stops[i].StationSeq] = i
 		}
 
-		plans[tripID] = &v2TripPlan{
+		plans[tripID] = &tripPlan{
 			TripID:     tripID,
 			Stops:      stops,
 			indexBySeq: indexBySeq,
@@ -125,7 +125,7 @@ func stationNameFromRow(row staticdata.TimetableStopRow, store *staticdata.Store
 	return strings.TrimSpace(station.Naziv)
 }
 
-func resolveV2StopCoordinates(row staticdata.TimetableStopRow, store *staticdata.Store) (float64, float64, bool) {
+func resolveStopCoordinates(row staticdata.TimetableStopRow, store *staticdata.Store) (float64, float64, bool) {
 	if row.GpsX != nil && row.GpsY != nil {
 		return *row.GpsX, *row.GpsY, true
 	}

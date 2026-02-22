@@ -9,12 +9,12 @@ import (
 	"github.com/EdiProdan/arRIval/internal/staticdata"
 )
 
-// V2Tracker is the Phase 2 stateful tracker core.
+// Tracker is the Phase 2 stateful tracker core.
 // It is intentionally not goroutine-safe; callers must serialize access.
-type V2Tracker struct {
+type Tracker struct {
 	store                        *staticdata.Store
-	tripPlans                    map[string]*v2TripPlan
-	stateByVoznjaBusID           map[int64]*v2VehicleState
+	tripPlans                    map[string]*tripPlan
+	stateByVoznjaBusID           map[int64]*vehicleState
 	stationMatchMeters           float64
 	staleAfter                   time.Duration
 	invalidProgressionResetAfter int
@@ -24,7 +24,7 @@ type V2Tracker struct {
 	tripIDResolver               TripIDResolver
 }
 
-func NewV2Tracker(store *staticdata.Store, cfg V2TrackerConfig) *V2Tracker {
+func NewTracker(store *staticdata.Store, cfg TrackerConfig) *Tracker {
 	stationMatchMeters := cfg.StationMatchMeters
 	if stationMatchMeters <= 0 {
 		stationMatchMeters = defaultStationMatchMeters
@@ -32,27 +32,27 @@ func NewV2Tracker(store *staticdata.Store, cfg V2TrackerConfig) *V2Tracker {
 
 	staleAfter := cfg.StaleAfter
 	if staleAfter <= 0 {
-		staleAfter = defaultV2StaleAfter
+		staleAfter = defaultStaleAfter
 	}
 
 	invalidProgressionResetAfter := cfg.InvalidProgressionResetAfter
 	if invalidProgressionResetAfter <= 0 {
-		invalidProgressionResetAfter = defaultV2InvalidProgressionResetAfter
+		invalidProgressionResetAfter = defaultInvalidProgressionResetAfter
 	}
 
 	emaSmoothingAlpha := cfg.EMASmoothingAlpha
 	if emaSmoothingAlpha <= 0 || emaSmoothingAlpha >= 1 {
-		emaSmoothingAlpha = defaultV2EMASmoothingAlpha
+		emaSmoothingAlpha = defaultEMASmoothingAlpha
 	}
 
 	trackerVersion := strings.TrimSpace(cfg.TrackerVersion)
 	if trackerVersion == "" {
-		trackerVersion = defaultV2TrackerVersion
+		trackerVersion = defaultTrackerVersion
 	}
 
 	serviceLocation := cfg.ServiceLocation
 	if serviceLocation == nil {
-		serviceLocation = defaultV2ServiceLocation()
+		serviceLocation = defaultServiceLocation()
 	}
 
 	tripIDResolver := cfg.TripIDResolver
@@ -60,10 +60,10 @@ func NewV2Tracker(store *staticdata.Store, cfg V2TrackerConfig) *V2Tracker {
 		tripIDResolver = defaultTripIDResolver
 	}
 
-	return &V2Tracker{
+	return &Tracker{
 		store:                        store,
-		tripPlans:                    buildV2TripPlans(store),
-		stateByVoznjaBusID:           make(map[int64]*v2VehicleState),
+		tripPlans:                    buildTripPlans(store),
+		stateByVoznjaBusID:           make(map[int64]*vehicleState),
 		stationMatchMeters:           stationMatchMeters,
 		staleAfter:                   staleAfter,
 		invalidProgressionResetAfter: invalidProgressionResetAfter,
@@ -74,15 +74,15 @@ func NewV2Tracker(store *staticdata.Store, cfg V2TrackerConfig) *V2Tracker {
 	}
 }
 
-func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
+func (t *Tracker) Track(input TrackInput) TrackOutput {
 	if input.ObservedAt.IsZero() {
-		return V2TrackOutput{SkipReason: V2SkipReasonInvalidObservedAt}
+		return TrackOutput{SkipReason: SkipReasonInvalidObservedAt}
 	}
 	if input.Bus.Lon == nil || input.Bus.Lat == nil {
-		return V2TrackOutput{SkipReason: V2SkipReasonMissingCoordinates}
+		return TrackOutput{SkipReason: SkipReasonMissingCoordinates}
 	}
 	if input.Bus.VoznjaBusID == nil {
-		return V2TrackOutput{SkipReason: V2SkipReasonMissingVoznjaBusID}
+		return TrackOutput{SkipReason: SkipReasonMissingVoznjaBusID}
 	}
 
 	observedAt := input.ObservedAt.UTC()
@@ -91,21 +91,21 @@ func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
 	state := t.stateForVoznjaBusID(voznjaBusID)
 	if !state.LastProgressAt.IsZero() && observedAt.Sub(state.LastProgressAt) >= t.staleAfter {
 		t.resetState(voznjaBusID)
-		return V2TrackOutput{SkipReason: V2SkipReasonResetAfterStaleState}
+		return TrackOutput{SkipReason: SkipReasonResetAfterStaleState}
 	}
 
 	plan, ok := t.tripPlans[state.TripID]
 	if !ok {
 		t.resetState(voznjaBusID)
-		return V2TrackOutput{SkipReason: V2SkipReasonNoTripForVoznjaBusID}
+		return TrackOutput{SkipReason: SkipReasonNoTripForVoznjaBusID}
 	}
 
 	match, hasCoordinateCandidate, found := t.matchTripStop(plan, *input.Bus.Lon, *input.Bus.Lat)
 	if !hasCoordinateCandidate {
-		return V2TrackOutput{SkipReason: V2SkipReasonStopMissingCoordinates}
+		return TrackOutput{SkipReason: SkipReasonStopMissingCoordinates}
 	}
 	if !found {
-		return V2TrackOutput{SkipReason: V2SkipReasonNoStopWithinMatchRadius}
+		return TrackOutput{SkipReason: SkipReasonNoStopWithinMatchRadius}
 	}
 
 	if state.HasProgress {
@@ -113,23 +113,23 @@ func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
 			state.ConsecutiveBackwardProgression++
 			if state.ConsecutiveBackwardProgression >= t.invalidProgressionResetAfter {
 				t.resetState(voznjaBusID)
-				return V2TrackOutput{SkipReason: V2SkipReasonResetAfterInvalidProgress}
+				return TrackOutput{SkipReason: SkipReasonResetAfterInvalidProgress}
 			}
-			return V2TrackOutput{SkipReason: V2SkipReasonBackwardStationSeq}
+			return TrackOutput{SkipReason: SkipReasonBackwardStationSeq}
 		}
 		if match.stop.StationSeq == state.LastObservedSeq {
 			state.ConsecutiveBackwardProgression = 0
-			return V2TrackOutput{SkipReason: V2SkipReasonDuplicateStationSeq}
+			return TrackOutput{SkipReason: SkipReasonDuplicateStationSeq}
 		}
 	}
 
 	if _, exists := state.EmittedSeq[match.stop.StationSeq]; exists {
-		return V2TrackOutput{SkipReason: V2SkipReasonDuplicateStationSeq}
+		return TrackOutput{SkipReason: SkipReasonDuplicateStationSeq}
 	}
 
 	scheduledTimes, ok := t.scheduledTimelineFromMatch(plan, match.index, observedAt)
 	if !ok {
-		return V2TrackOutput{SkipReason: V2SkipReasonScheduleAlignmentFailed}
+		return TrackOutput{SkipReason: SkipReasonScheduleAlignmentFailed}
 	}
 
 	scheduledMatched := scheduledTimes[match.index]
@@ -142,7 +142,7 @@ func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
 	state.ConsecutiveBackwardProgression = 0
 	state.EmittedSeq[match.stop.StationSeq] = struct{}{}
 
-	observedEvent := contracts.ObservedDelayV2{
+	observedEvent := contracts.ObservedDelay{
 		TripID:         state.TripID,
 		VoznjaBusID:    voznjaBusID,
 		GBR:            intPtrToInt64Ptr(input.Bus.GBR),
@@ -158,8 +158,8 @@ func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
 		TrackerVersion: t.trackerVersion,
 	}
 
-	output := V2TrackOutput{
-		Observed: []contracts.ObservedDelayV2{observedEvent},
+	output := TrackOutput{
+		Observed: []contracts.ObservedDelay{observedEvent},
 	}
 
 	// Predictions intentionally fan out to all remaining stops (O(N^2) per trip)
@@ -169,7 +169,7 @@ func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
 		scheduled := scheduledTimes[i]
 		predicted := scheduled.Add(time.Duration(predictedDelaySeconds) * time.Second)
 
-		output.Predicted = append(output.Predicted, contracts.PredictedDelayV2{
+		output.Predicted = append(output.Predicted, contracts.PredictedDelay{
 			TripID:                state.TripID,
 			VoznjaBusID:           voznjaBusID,
 			LinVarID:              stop.LinVarID,
@@ -188,15 +188,15 @@ func (t *V2Tracker) Track(input V2TrackInput) V2TrackOutput {
 	return output
 }
 
-type v2TripStopMatch struct {
-	stop      v2TripStop
+type tripStopMatch struct {
+	stop      tripStop
 	index     int
 	distanceM float64
 }
 
-func (t *V2Tracker) matchTripStop(plan *v2TripPlan, lon, lat float64) (v2TripStopMatch, bool, bool) {
+func (t *Tracker) matchTripStop(plan *tripPlan, lon, lat float64) (tripStopMatch, bool, bool) {
 	var (
-		match                   v2TripStopMatch
+		match                   tripStopMatch
 		hasCoordinateCandidates bool
 		found                   bool
 	)
@@ -212,7 +212,7 @@ func (t *V2Tracker) matchTripStop(plan *v2TripPlan, lon, lat float64) (v2TripSto
 			continue
 		}
 		if !found || distance < match.distanceM {
-			match = v2TripStopMatch{
+			match = tripStopMatch{
 				stop:      stop,
 				index:     i,
 				distanceM: distance,
@@ -224,7 +224,7 @@ func (t *V2Tracker) matchTripStop(plan *v2TripPlan, lon, lat float64) (v2TripSto
 	return match, hasCoordinateCandidates, found
 }
 
-func (t *V2Tracker) scheduledTimelineFromMatch(plan *v2TripPlan, matchedIndex int, observedAt time.Time) ([]time.Time, bool) {
+func (t *Tracker) scheduledTimelineFromMatch(plan *tripPlan, matchedIndex int, observedAt time.Time) ([]time.Time, bool) {
 	if matchedIndex < 0 || matchedIndex >= len(plan.Stops) {
 		return nil, false
 	}
@@ -251,7 +251,7 @@ func defaultTripIDResolver(voznjaBusID int64) string {
 	return strconv.FormatInt(voznjaBusID, 10)
 }
 
-func defaultV2ServiceLocation() *time.Location {
+func defaultServiceLocation() *time.Location {
 	loc, err := time.LoadLocation("Europe/Zagreb")
 	if err != nil {
 		return time.UTC

@@ -244,7 +244,7 @@
           "refId": "F"
         }
       ],
-      "title": "Delay Distribution (V2)",
+      "title": "Delay Distribution",
       "type": "timeseries"
     },
     {
@@ -509,7 +509,7 @@
           "refId": "D"
         }
       ],
-      "title": "Prediction Volume (V2)",
+      "title": "Prediction Volume",
       "type": "timeseries"
     },
     {
@@ -589,7 +589,7 @@
           "refId": "B"
         }
       ],
-      "title": "Tracker Lock Quality (V2)",
+      "title": "Tracker Lock Quality",
       "type": "timeseries"
     }
   ],

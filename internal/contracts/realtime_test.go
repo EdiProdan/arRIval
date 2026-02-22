@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestRealtimeSnapshotV2JSONShape(t *testing.T) {
-	snapshot := RealtimeSnapshotV2{
+func TestRealtimeSnapshotJSONShape(t *testing.T) {
+	snapshot := RealtimeSnapshot{
 		GeneratedAt: "2026-02-21T12:00:00Z",
 		Positions: []RealtimePosition{
 			{
@@ -16,7 +16,7 @@ func TestRealtimeSnapshotV2JSONShape(t *testing.T) {
 				ObservedAt: "2026-02-21T12:00:00Z",
 			},
 		},
-		ObservedDelays: []ObservedDelayV2{
+		ObservedDelays: []ObservedDelay{
 			{
 				TripID:         "trip-1",
 				VoznjaBusID:    101,
@@ -29,10 +29,10 @@ func TestRealtimeSnapshotV2JSONShape(t *testing.T) {
 				ObservedTime:   "2026-02-21T12:06:30Z",
 				DelaySeconds:   90,
 				DistanceM:      16.8,
-				TrackerVersion: "v2",
+				TrackerVersion: "current",
 			},
 		},
-		PredictedDelays: []PredictedDelayV2{
+		PredictedDelays: []PredictedDelay{
 			{
 				TripID:                "trip-1",
 				VoznjaBusID:           101,
@@ -45,10 +45,10 @@ func TestRealtimeSnapshotV2JSONShape(t *testing.T) {
 				PredictedTime:         "2026-02-21T12:11:30Z",
 				PredictedDelaySeconds: 90,
 				GeneratedAt:           "2026-02-21T12:00:00Z",
-				TrackerVersion:        "v2",
+				TrackerVersion:        "current",
 			},
 		},
-		Meta: RealtimeSnapshotMetaV2{
+		Meta: RealtimeSnapshotMeta{
 			PositionsCount:       1,
 			ObservedDelaysCount:  1,
 			PredictedDelaysCount: 1,
@@ -87,8 +87,8 @@ func TestRealtimeSnapshotV2JSONShape(t *testing.T) {
 	}
 }
 
-func TestRealtimeV2WSUpdatePayloads(t *testing.T) {
-	observed := ObservedDelayV2{
+func TestRealtimeWSUpdatePayloads(t *testing.T) {
+	observed := ObservedDelay{
 		TripID:         "trip-observed",
 		VoznjaBusID:    5001,
 		LinVarID:       "1A",
@@ -100,9 +100,9 @@ func TestRealtimeV2WSUpdatePayloads(t *testing.T) {
 		ObservedTime:   "2026-02-21T12:02:00Z",
 		DelaySeconds:   120,
 		DistanceM:      11.5,
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	}
-	predicted := PredictedDelayV2{
+	predicted := PredictedDelay{
 		TripID:                "trip-predicted",
 		VoznjaBusID:           5001,
 		LinVarID:              "1A",
@@ -114,7 +114,7 @@ func TestRealtimeV2WSUpdatePayloads(t *testing.T) {
 		PredictedTime:         "2026-02-21T12:07:00Z",
 		PredictedDelaySeconds: 120,
 		GeneratedAt:           "2026-02-21T12:00:00Z",
-		TrackerVersion:        "v2",
+		TrackerVersion:        "current",
 	}
 
 	tests := []struct {
@@ -125,7 +125,7 @@ func TestRealtimeV2WSUpdatePayloads(t *testing.T) {
 	}{
 		{
 			name:      "observed",
-			eventType: RealtimeEventDelayObservedUpdateV2,
+			eventType: RealtimeEventDelayObservedUpdate,
 			data: RealtimeObservedDelayUpdate{
 				ObservedDelay: observed,
 			},
@@ -133,7 +133,7 @@ func TestRealtimeV2WSUpdatePayloads(t *testing.T) {
 		},
 		{
 			name:      "prediction",
-			eventType: RealtimeEventDelayPredictionUpdateV2,
+			eventType: RealtimeEventDelayPredictionUpdate,
 			data: RealtimePredictedDelayUpdate{
 				PredictedDelay: predicted,
 			},

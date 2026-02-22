@@ -4,13 +4,13 @@ Developer workspace for ingesting and analyzing Rijeka AUTOTROLEJ transit data.
 
 ## Documentation
 
-Canonical docs follow the Diátaxis structure in `diataxis_docs/`.
+Canonical docs follow the Diátaxis structure in `docs/`.
 
-- Start page: `diataxis_docs/README.md`
-- Tutorial: `diataxis_docs/tutorials/first-local-run.md`
-- How-to guides: `diataxis_docs/how-to/`
-- Reference: `diataxis_docs/reference/`
-- Explanation: `diataxis_docs/explanation/`
+- Start page: `docs/README.md`
+- Tutorial: `docs/tutorials/first-local-run.md`
+- How-to guides: `docs/how-to/`
+- Reference: `docs/reference/`
+- Explanation: `docs/explanation/`
 
 ## CI
 
@@ -45,8 +45,8 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 
 4. Verify Kafka flow:
    - raw topic: `docker compose exec redpanda rpk topic consume bus-positions-raw -n 1`
-   - observed delay topic: `docker compose exec redpanda rpk topic consume bus-delay-observed-v2 -n 1`
-   - predicted delay topic: `docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1`
+   - observed delay topic: `docker compose exec redpanda rpk topic consume bus-delay-observed -n 1`
+   - predicted delay topic: `docker compose exec redpanda rpk topic consume bus-delay-predicted -n 1`
 
 5. Verify realtime API:
    - UI: `http://localhost:8080/`
@@ -56,8 +56,8 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 
 6. Verify Parquet outputs (UTC date partition):
    - Bronze: `data/bronze/YYYY-MM-DD/positions.parquet`
-   - Silver observed: `data/silver/YYYY-MM-DD/observed_delays_v2.parquet`
-   - Silver predicted: `data/silver/YYYY-MM-DD/predicted_delays_v2.parquet`
+   - Silver observed: `data/silver/YYYY-MM-DD/observed_delays.parquet`
+   - Silver predicted: `data/silver/YYYY-MM-DD/predicted_delays.parquet`
    - Gold: `data/gold/YYYY-MM-DD/stats.parquet`
 
 7. Verify observability:
@@ -101,4 +101,3 @@ Frontend checks:
 - `deploy/prometheus` - scrape configuration
 - `deploy/grafana` - provisioning and dashboard JSON
 - `data` - Bronze/Silver/Gold outputs and static datasets
-branch protection test

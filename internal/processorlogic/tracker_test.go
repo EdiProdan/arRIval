@@ -12,47 +12,47 @@ import (
 	"github.com/EdiProdan/arRIval/internal/staticdata"
 )
 
-func TestV2TrackerMissingInputFields(t *testing.T) {
-	store := buildV2TestStore(t, baseV2Stations(), baseV2Timetable())
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+func TestTrackerMissingInputFields(t *testing.T) {
+	store := buildTestStore(t, baseStations(), baseTimetable())
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	observedAt := time.Date(2026, 2, 21, 12, 0, 0, 0, time.UTC)
 	lon := 14.4400
 	lat := 45.3300
 	voznjaBusID := 1001
 
-	out := tracker.Track(V2TrackInput{
+	out := tracker.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			Lon: &lon,
 			Lat: &lat,
 		},
 	})
-	if out.SkipReason != V2SkipReasonMissingVoznjaBusID {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonMissingVoznjaBusID)
+	if out.SkipReason != SkipReasonMissingVoznjaBusID {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonMissingVoznjaBusID)
 	}
 
-	out = tracker.Track(V2TrackInput{
+	out = tracker.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: &voznjaBusID,
 		},
 	})
-	if out.SkipReason != V2SkipReasonMissingCoordinates {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonMissingCoordinates)
+	if out.SkipReason != SkipReasonMissingCoordinates {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonMissingCoordinates)
 	}
 }
 
-func TestV2TrackerLockResolution(t *testing.T) {
-	store := buildV2TestStore(t, baseV2Stations(), baseV2Timetable())
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+func TestTrackerLockResolution(t *testing.T) {
+	store := buildTestStore(t, baseStations(), baseTimetable())
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	observedAt := time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)
 	lon := 14.4400
 	lat := 45.3300
 	missingTripBusID := 9999
 
-	out := tracker.Track(V2TrackInput{
+	out := tracker.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: &missingTripBusID,
@@ -60,12 +60,12 @@ func TestV2TrackerLockResolution(t *testing.T) {
 			Lat:         &lat,
 		},
 	})
-	if out.SkipReason != V2SkipReasonNoTripForVoznjaBusID {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonNoTripForVoznjaBusID)
+	if out.SkipReason != SkipReasonNoTripForVoznjaBusID {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonNoTripForVoznjaBusID)
 	}
 
 	voznjaBusID := 1001
-	out = tracker.Track(V2TrackInput{
+	out = tracker.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: &voznjaBusID,
@@ -73,7 +73,7 @@ func TestV2TrackerLockResolution(t *testing.T) {
 			Lat:         &lat,
 		},
 	})
-	if out.SkipReason != V2SkipReasonNone {
+	if out.SkipReason != SkipReasonNone {
 		t.Fatalf("SkipReason = %q, want none", out.SkipReason)
 	}
 	if len(out.Observed) != 1 {
@@ -87,21 +87,21 @@ func TestV2TrackerLockResolution(t *testing.T) {
 	}
 }
 
-func TestV2TrackerCoordinateResolutionFallbackAndMissing(t *testing.T) {
-	stations := baseV2Stations()
-	timetable := baseV2Timetable()
+func TestTrackerCoordinateResolutionFallbackAndMissing(t *testing.T) {
+	stations := baseStations()
+	timetable := baseTimetable()
 	timetable[0].GpsX = nil
 	timetable[0].GpsY = nil
 
-	store := buildV2TestStore(t, stations, timetable)
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+	store := buildTestStore(t, stations, timetable)
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	observedAt := time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)
 	voznjaBusID := 1001
 	lon := 14.4400
 	lat := 45.3300
 
-	out := tracker.Track(V2TrackInput{
+	out := tracker.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: &voznjaBusID,
@@ -109,7 +109,7 @@ func TestV2TrackerCoordinateResolutionFallbackAndMissing(t *testing.T) {
 			Lat:         &lat,
 		},
 	})
-	if out.SkipReason != V2SkipReasonNone {
+	if out.SkipReason != SkipReasonNone {
 		t.Fatalf("SkipReason = %q, want none", out.SkipReason)
 	}
 	if len(out.Observed) != 1 || out.Observed[0].StationSeq != 1 {
@@ -124,10 +124,10 @@ func TestV2TrackerCoordinateResolutionFallbackAndMissing(t *testing.T) {
 		timetable[i].GpsX = nil
 		timetable[i].GpsY = nil
 	}
-	storeMissing := buildV2TestStore(t, stations, timetable)
-	trackerMissing := NewV2Tracker(storeMissing, V2TrackerConfig{ServiceLocation: time.UTC})
+	storeMissing := buildTestStore(t, stations, timetable)
+	trackerMissing := NewTracker(storeMissing, TrackerConfig{ServiceLocation: time.UTC})
 
-	out = trackerMissing.Track(V2TrackInput{
+	out = trackerMissing.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: &voznjaBusID,
@@ -135,21 +135,21 @@ func TestV2TrackerCoordinateResolutionFallbackAndMissing(t *testing.T) {
 			Lat:         &lat,
 		},
 	})
-	if out.SkipReason != V2SkipReasonStopMissingCoordinates {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonStopMissingCoordinates)
+	if out.SkipReason != SkipReasonStopMissingCoordinates {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonStopMissingCoordinates)
 	}
 }
 
-func TestV2TrackerNoStopWithinMatchRadius(t *testing.T) {
-	store := buildV2TestStore(t, baseV2Stations(), baseV2Timetable())
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+func TestTrackerNoStopWithinMatchRadius(t *testing.T) {
+	store := buildTestStore(t, baseStations(), baseTimetable())
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	observedAt := time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)
 	voznjaBusID := 1001
 	lon := 0.0
 	lat := 0.0
 
-	out := tracker.Track(V2TrackInput{
+	out := tracker.Track(TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: &voznjaBusID,
@@ -157,100 +157,100 @@ func TestV2TrackerNoStopWithinMatchRadius(t *testing.T) {
 			Lat:         &lat,
 		},
 	})
-	if out.SkipReason != V2SkipReasonNoStopWithinMatchRadius {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonNoStopWithinMatchRadius)
+	if out.SkipReason != SkipReasonNoStopWithinMatchRadius {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonNoStopWithinMatchRadius)
 	}
 }
 
-func TestV2TrackerProgressionAndInvalidReset(t *testing.T) {
-	store := buildV2TestStore(t, baseV2Stations(), baseV2Timetable())
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+func TestTrackerProgressionAndInvalidReset(t *testing.T) {
+	store := buildTestStore(t, baseStations(), baseTimetable())
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	voznjaBusID := 1001
 	t0 := time.Date(2026, 2, 21, 12, 0, 30, 0, time.UTC)
 
-	out := tracker.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0))
+	out := tracker.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0))
 	if len(out.Observed) != 1 || out.Observed[0].StationSeq != 1 {
 		t.Fatalf("first progression failed: %+v", out)
 	}
 
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(5*time.Minute)))
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(5*time.Minute)))
 	if len(out.Observed) != 1 || out.Observed[0].StationSeq != 2 {
 		t.Fatalf("second progression failed: %+v", out)
 	}
 
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(5*time.Minute+10*time.Second)))
-	if out.SkipReason != V2SkipReasonDuplicateStationSeq {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonDuplicateStationSeq)
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(5*time.Minute+10*time.Second)))
+	if out.SkipReason != SkipReasonDuplicateStationSeq {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonDuplicateStationSeq)
 	}
 
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+20*time.Second)))
-	if out.SkipReason != V2SkipReasonBackwardStationSeq {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonBackwardStationSeq)
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+20*time.Second)))
+	if out.SkipReason != SkipReasonBackwardStationSeq {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonBackwardStationSeq)
 	}
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+30*time.Second)))
-	if out.SkipReason != V2SkipReasonBackwardStationSeq {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonBackwardStationSeq)
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+30*time.Second)))
+	if out.SkipReason != SkipReasonBackwardStationSeq {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonBackwardStationSeq)
 	}
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+40*time.Second)))
-	if out.SkipReason != V2SkipReasonResetAfterInvalidProgress {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonResetAfterInvalidProgress)
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+40*time.Second)))
+	if out.SkipReason != SkipReasonResetAfterInvalidProgress {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonResetAfterInvalidProgress)
 	}
 
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+50*time.Second)))
-	if out.SkipReason != V2SkipReasonNone || len(out.Observed) != 1 || out.Observed[0].StationSeq != 1 {
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0.Add(5*time.Minute+50*time.Second)))
+	if out.SkipReason != SkipReasonNone || len(out.Observed) != 1 || out.Observed[0].StationSeq != 1 {
 		t.Fatalf("relock after reset failed: %+v", out)
 	}
 }
 
-func TestV2TrackerStaleResetBoundary(t *testing.T) {
-	store := buildV2TestStore(t, baseV2Stations(), baseV2Timetable())
+func TestTrackerStaleResetBoundary(t *testing.T) {
+	store := buildTestStore(t, baseStations(), baseTimetable())
 	voznjaBusID := 1001
 	t0 := time.Date(2026, 2, 21, 12, 0, 10, 0, time.UTC)
 
-	trackerNoReset := NewV2Tracker(store, V2TrackerConfig{
+	trackerNoReset := NewTracker(store, TrackerConfig{
 		ServiceLocation: time.UTC,
 		StaleAfter:      15 * time.Minute,
 	})
-	out := trackerNoReset.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0))
+	out := trackerNoReset.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0))
 	if len(out.Observed) != 1 {
 		t.Fatalf("initial progress failed: %+v", out)
 	}
-	out = trackerNoReset.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(14*time.Minute+59*time.Second)))
-	if out.SkipReason != V2SkipReasonNone || len(out.Observed) != 1 {
+	out = trackerNoReset.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(14*time.Minute+59*time.Second)))
+	if out.SkipReason != SkipReasonNone || len(out.Observed) != 1 {
 		t.Fatalf("14m59s should not reset stale state: %+v", out)
 	}
 
-	trackerReset := NewV2Tracker(store, V2TrackerConfig{
+	trackerReset := NewTracker(store, TrackerConfig{
 		ServiceLocation: time.UTC,
 		StaleAfter:      15 * time.Minute,
 	})
-	out = trackerReset.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, t0))
+	out = trackerReset.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, t0))
 	if len(out.Observed) != 1 {
 		t.Fatalf("initial progress failed: %+v", out)
 	}
-	out = trackerReset.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(15*time.Minute)))
-	if out.SkipReason != V2SkipReasonResetAfterStaleState {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonResetAfterStaleState)
+	out = trackerReset.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(15*time.Minute)))
+	if out.SkipReason != SkipReasonResetAfterStaleState {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonResetAfterStaleState)
 	}
-	out = trackerReset.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(15*time.Minute+time.Second)))
-	if out.SkipReason != V2SkipReasonNone || len(out.Observed) != 1 {
+	out = trackerReset.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, t0.Add(15*time.Minute+time.Second)))
+	if out.SkipReason != SkipReasonNone || len(out.Observed) != 1 {
 		t.Fatalf("reacquire after stale reset failed: %+v", out)
 	}
 }
 
-func TestV2TrackerEMAAndResetBehavior(t *testing.T) {
-	store := buildV2TestStore(t, baseV2Stations(), baseV2Timetable())
+func TestTrackerEMAAndResetBehavior(t *testing.T) {
+	store := buildTestStore(t, baseStations(), baseTimetable())
 	voznjaBusID := 1001
 
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
-	out := tracker.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)))
+	out := tracker.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)))
 	if len(out.Predicted) == 0 || out.Predicted[0].PredictedDelaySeconds != 60 {
 		t.Fatalf("first EMA value mismatch: %+v", out.Predicted)
 	}
 
-	out = tracker.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, time.Date(2026, 2, 21, 12, 15, 0, 0, time.UTC)))
+	out = tracker.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, time.Date(2026, 2, 21, 12, 15, 0, 0, time.UTC)))
 	if len(out.Predicted) != 2 {
 		t.Fatalf("predicted len = %d, want 2", len(out.Predicted))
 	}
@@ -259,20 +259,20 @@ func TestV2TrackerEMAAndResetBehavior(t *testing.T) {
 		t.Fatalf("PredictedDelaySeconds = %d, want %d", out.Predicted[0].PredictedDelaySeconds, 249)
 	}
 
-	trackerReset := NewV2Tracker(store, V2TrackerConfig{
+	trackerReset := NewTracker(store, TrackerConfig{
 		ServiceLocation: time.UTC,
 		StaleAfter:      5 * time.Minute,
 	})
-	out = trackerReset.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)))
+	out = trackerReset.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, time.Date(2026, 2, 21, 12, 1, 0, 0, time.UTC)))
 	if len(out.Observed) != 1 {
 		t.Fatalf("initial progression failed: %+v", out)
 	}
-	out = trackerReset.Track(v2InputForStop(voznjaBusID, 14.4410, 45.3310, time.Date(2026, 2, 21, 12, 7, 0, 0, time.UTC)))
-	if out.SkipReason != V2SkipReasonResetAfterStaleState {
-		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, V2SkipReasonResetAfterStaleState)
+	out = trackerReset.Track(inputForStop(voznjaBusID, 14.4410, 45.3310, time.Date(2026, 2, 21, 12, 7, 0, 0, time.UTC)))
+	if out.SkipReason != SkipReasonResetAfterStaleState {
+		t.Fatalf("SkipReason = %q, want %q", out.SkipReason, SkipReasonResetAfterStaleState)
 	}
-	out = trackerReset.Track(v2InputForStop(voznjaBusID, 14.4400, 45.3300, time.Date(2026, 2, 21, 12, 7, 10, 0, time.UTC)))
-	if out.SkipReason != V2SkipReasonNone || len(out.Predicted) == 0 {
+	out = trackerReset.Track(inputForStop(voznjaBusID, 14.4400, 45.3300, time.Date(2026, 2, 21, 12, 7, 10, 0, time.UTC)))
+	if out.SkipReason != SkipReasonNone || len(out.Predicted) == 0 {
 		t.Fatalf("reacquire after stale reset failed: %+v", out)
 	}
 	if out.Predicted[0].PredictedDelaySeconds != out.Observed[0].DelaySeconds {
@@ -280,7 +280,7 @@ func TestV2TrackerEMAAndResetBehavior(t *testing.T) {
 	}
 }
 
-func TestV2TrackerMidnightCrossing(t *testing.T) {
+func TestTrackerMidnightCrossing(t *testing.T) {
 	stations := []staticdata.Station{
 		{StanicaID: 11, Naziv: "Night A", GpsX: float64Ptr(14.5000), GpsY: float64Ptr(45.3200)},
 		{StanicaID: 12, Naziv: "Night B", GpsX: float64Ptr(14.5005), GpsY: float64Ptr(45.3205)},
@@ -292,12 +292,12 @@ func TestV2TrackerMidnightCrossing(t *testing.T) {
 		{PolazakID: "2001", StanicaID: 13, LinVarID: "n-1", Polazak: "00:03:00", RedniBrojStanice: 3, BrojLinije: "N1", Naziv: "Night C", GpsX: float64Ptr(14.5010), GpsY: float64Ptr(45.3210)},
 	}
 
-	store := buildV2TestStore(t, stations, timetable)
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+	store := buildTestStore(t, stations, timetable)
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	voznjaBusID := 2001
-	out := tracker.Track(v2InputForStop(voznjaBusID, 14.5000, 45.3200, time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)))
-	if out.SkipReason != V2SkipReasonNone || len(out.Observed) != 1 || len(out.Predicted) < 1 {
+	out := tracker.Track(inputForStop(voznjaBusID, 14.5000, 45.3200, time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC)))
+	if out.SkipReason != SkipReasonNone || len(out.Observed) != 1 || len(out.Predicted) < 1 {
 		t.Fatalf("unexpected output: %+v", out)
 	}
 
@@ -318,8 +318,8 @@ func TestV2TrackerMidnightCrossing(t *testing.T) {
 	}
 }
 
-func v2InputForStop(voznjaBusID int, lon, lat float64, observedAt time.Time) V2TrackInput {
-	return V2TrackInput{
+func inputForStop(voznjaBusID int, lon, lat float64, observedAt time.Time) TrackInput {
+	return TrackInput{
 		ObservedAt: observedAt,
 		Bus: autotrolej.LiveBus{
 			VoznjaBusID: intPtr(voznjaBusID),
@@ -329,7 +329,7 @@ func v2InputForStop(voznjaBusID int, lon, lat float64, observedAt time.Time) V2T
 	}
 }
 
-func baseV2Stations() []staticdata.Station {
+func baseStations() []staticdata.Station {
 	return []staticdata.Station{
 		{StanicaID: 1, Naziv: "Stop 1", GpsX: float64Ptr(14.4400), GpsY: float64Ptr(45.3300)},
 		{StanicaID: 2, Naziv: "Stop 2", GpsX: float64Ptr(14.4410), GpsY: float64Ptr(45.3310)},
@@ -338,7 +338,7 @@ func baseV2Stations() []staticdata.Station {
 	}
 }
 
-func baseV2Timetable() []staticdata.TimetableStopRow {
+func baseTimetable() []staticdata.TimetableStopRow {
 	return []staticdata.TimetableStopRow{
 		{ID: 1, PolazakID: "1001", StanicaID: 1, LinVarID: "lv-1", Polazak: "12:00:00", RedniBrojStanice: 1, BrojLinije: "2A", Naziv: "Stop 1", GpsX: float64Ptr(14.4400), GpsY: float64Ptr(45.3300)},
 		{ID: 2, PolazakID: "1001", StanicaID: 2, LinVarID: "lv-1", Polazak: "12:05:00", RedniBrojStanice: 2, BrojLinije: "2A", Naziv: "Stop 2", GpsX: float64Ptr(14.4410), GpsY: float64Ptr(45.3310)},
@@ -347,7 +347,7 @@ func baseV2Timetable() []staticdata.TimetableStopRow {
 	}
 }
 
-func buildV2TestStore(t *testing.T, stations []staticdata.Station, timetable []staticdata.TimetableStopRow) *staticdata.Store {
+func buildTestStore(t *testing.T, stations []staticdata.Station, timetable []staticdata.TimetableStopRow) *staticdata.Store {
 	t.Helper()
 
 	linePaths := buildLinePathsFromTimetable(timetable)
