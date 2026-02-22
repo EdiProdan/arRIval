@@ -1,8 +1,8 @@
 package contracts
 
-// ObservedDelayV2 is emitted when a vehicle has reached a scheduled stop and
+// ObservedDelay is emitted when a vehicle has reached a scheduled stop and
 // a real observed delay can be calculated.
-type ObservedDelayV2 struct {
+type ObservedDelay struct {
 	TripID         string  `json:"trip_id"`
 	VoznjaBusID    int64   `json:"voznja_bus_id"`
 	GBR            *int64  `json:"gbr,omitempty"`
@@ -18,8 +18,8 @@ type ObservedDelayV2 struct {
 	TrackerVersion string  `json:"tracker_version"`
 }
 
-// PredictedDelayV2 is emitted for future stops on the currently tracked trip.
-type PredictedDelayV2 struct {
+// PredictedDelay is emitted for future stops on the currently tracked trip.
+type PredictedDelay struct {
 	TripID                string `json:"trip_id"`
 	VoznjaBusID           int64  `json:"voznja_bus_id"`
 	LinVarID              string `json:"lin_var_id"`

@@ -12,10 +12,10 @@ import (
 	"github.com/EdiProdan/arRIval/internal/staticdata"
 )
 
-func TestV2TrackerReplaySyntheticFixture(t *testing.T) {
-	fixture := loadV2ReplayFixture(t, "testdata/v2/synthetic/fixture.json")
-	store := buildV2ReplayStore(t, fixture)
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+func TestTrackerReplaySyntheticFixture(t *testing.T) {
+	fixture := loadReplayFixture(t, "testdata/synthetic/fixture.json")
+	store := buildReplayStore(t, fixture)
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	var (
 		observedCount  int
@@ -29,7 +29,7 @@ func TestV2TrackerReplaySyntheticFixture(t *testing.T) {
 			t.Fatalf("parse observed_at %q: %v", input.ObservedAt, err)
 		}
 
-		out := tracker.Track(V2TrackInput{
+		out := tracker.Track(TrackInput{
 			ObservedAt: observedAt,
 			Bus:        input.Bus,
 		})
@@ -53,10 +53,10 @@ func TestV2TrackerReplaySyntheticFixture(t *testing.T) {
 	}
 }
 
-func TestV2TrackerReplayRealCaptureSmoke(t *testing.T) {
-	fixture := loadV2ReplayFixture(t, "testdata/v2/real_capture/fixture.json")
-	store := buildV2ReplayStore(t, fixture)
-	tracker := NewV2Tracker(store, V2TrackerConfig{ServiceLocation: time.UTC})
+func TestTrackerReplayRealCaptureSmoke(t *testing.T) {
+	fixture := loadReplayFixture(t, "testdata/real_capture/fixture.json")
+	store := buildReplayStore(t, fixture)
+	tracker := NewTracker(store, TrackerConfig{ServiceLocation: time.UTC})
 
 	var (
 		observedCount int
@@ -70,11 +70,11 @@ func TestV2TrackerReplayRealCaptureSmoke(t *testing.T) {
 			t.Fatalf("parse observed_at %q: %v", input.ObservedAt, err)
 		}
 
-		out := tracker.Track(V2TrackInput{
+		out := tracker.Track(TrackInput{
 			ObservedAt: observedAt,
 			Bus:        input.Bus,
 		})
-		if out.SkipReason == V2SkipReasonNoTripForVoznjaBusID {
+		if out.SkipReason == SkipReasonNoTripForVoznjaBusID {
 			noTripSkips++
 		}
 		observedCount += len(out.Observed)
@@ -92,19 +92,19 @@ func TestV2TrackerReplayRealCaptureSmoke(t *testing.T) {
 	}
 }
 
-type v2ReplayFixture struct {
+type replayFixture struct {
 	Stations  []staticdata.Station          `json:"stations"`
 	LinePaths []staticdata.LinePathRow      `json:"line_paths"`
 	Timetable []staticdata.TimetableStopRow `json:"timetable"`
-	Inputs    []v2ReplayInput               `json:"inputs"`
+	Inputs    []replayInput                 `json:"inputs"`
 }
 
-type v2ReplayInput struct {
+type replayInput struct {
 	ObservedAt string             `json:"observed_at"`
 	Bus        autotrolej.LiveBus `json:"bus"`
 }
 
-func loadV2ReplayFixture(t *testing.T, relativePath string) v2ReplayFixture {
+func loadReplayFixture(t *testing.T, relativePath string) replayFixture {
 	t.Helper()
 
 	raw, err := os.ReadFile(filepath.Clean(relativePath))
@@ -112,7 +112,7 @@ func loadV2ReplayFixture(t *testing.T, relativePath string) v2ReplayFixture {
 		t.Fatalf("read fixture %s: %v", relativePath, err)
 	}
 
-	var fixture v2ReplayFixture
+	var fixture replayFixture
 	if err := json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatalf("unmarshal fixture %s: %v", relativePath, err)
 	}
@@ -120,7 +120,7 @@ func loadV2ReplayFixture(t *testing.T, relativePath string) v2ReplayFixture {
 	return fixture
 }
 
-func buildV2ReplayStore(t *testing.T, fixture v2ReplayFixture) *staticdata.Store {
+func buildReplayStore(t *testing.T, fixture replayFixture) *staticdata.Store {
 	t.Helper()
 
 	linePaths := fixture.LinePaths

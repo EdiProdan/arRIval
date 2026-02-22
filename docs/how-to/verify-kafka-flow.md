@@ -1,10 +1,6 @@
 # How-to: Verify Kafka Flow
 
-Use this guide to confirm live ingestion and V2 delay events are flowing through Redpanda.
-
-## Phase 4 cutover note
-
-As of **February 21, 2026**, `processor`, `aggregator`, and `realtime` all use V2 delay topics.
+Use this guide to confirm live ingestion and delay events are flowing through Redpanda.
 
 ## Preconditions
 
@@ -18,10 +14,9 @@ docker compose exec redpanda rpk topic list
 ```
 
 Expected topics:
-
 - `bus-positions-raw`
-- `bus-delay-observed-v2`
-- `bus-delay-predicted-v2`
+- `bus-delay-observed`
+- `bus-delay-predicted`
 
 ## 2) Consume one raw message
 
@@ -29,29 +24,36 @@ Expected topics:
 docker compose exec redpanda rpk topic consume bus-positions-raw -n 1
 ```
 
-Expected shape:
+Expected envelope keys:
+- `msg`
+- `res`
+- `err`
 
-- envelope with `msg`, `res`, `err`
-
-## 3) Consume one observed V2 delay message
-
-```bash
-docker compose exec redpanda rpk topic consume bus-delay-observed-v2 -n 1
-```
-
-Expected shape:
-
-- `ObservedDelayV2` fields (`trip_id`, `station_seq`, `observed_time`, `delay_seconds`, `tracker_version`, ...)
-
-## 4) Consume one predicted V2 delay message
+## 3) Consume one observed delay message
 
 ```bash
-docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1
+docker compose exec redpanda rpk topic consume bus-delay-observed -n 1
 ```
 
-Expected shape:
+Expected fields include:
+- `trip_id`
+- `station_seq`
+- `observed_time`
+- `delay_seconds`
+- `tracker_version`
 
-- `PredictedDelayV2` fields (`trip_id`, `station_seq`, `predicted_time`, `predicted_delay_seconds`, `generated_at`, ...)
+## 4) Consume one predicted delay message
+
+```bash
+docker compose exec redpanda rpk topic consume bus-delay-predicted -n 1
+```
+
+Expected fields include:
+- `trip_id`
+- `station_seq`
+- `predicted_time`
+- `predicted_delay_seconds`
+- `generated_at`
 
 ## 5) Cross-check logs
 
@@ -60,6 +62,5 @@ docker compose logs --tail=100 ingester processor
 ```
 
 Confirm:
-
 - ingester publishes to `bus-positions-raw`
-- processor consumes raw input and publishes to both V2 delay topics
+- processor publishes to both delay topics

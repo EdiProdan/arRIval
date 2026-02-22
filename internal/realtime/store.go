@@ -26,12 +26,12 @@ type positionEntry struct {
 }
 
 type observedDelayEntry struct {
-	value     contracts.ObservedDelayV2
+	value     contracts.ObservedDelay
 	updatedAt time.Time
 }
 
 type predictedDelayEntry struct {
-	value     contracts.PredictedDelayV2
+	value     contracts.PredictedDelay
 	updatedAt time.Time
 }
 
@@ -89,11 +89,11 @@ func (s *Store) UpsertPositions(positions []contracts.RealtimePosition) {
 	}
 }
 
-func (s *Store) UpsertObservedDelay(event contracts.ObservedDelayV2) {
+func (s *Store) UpsertObservedDelay(event contracts.ObservedDelay) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := delayV2Key(event.TripID, event.StationID)
+	key := delayKey(event.TripID, event.StationID)
 	s.observed[key] = observedDelayEntry{
 		value:     event,
 		updatedAt: s.now().UTC(),
@@ -106,11 +106,11 @@ func (s *Store) UpsertObservedDelay(event contracts.ObservedDelayV2) {
 	}
 }
 
-func (s *Store) UpsertPredictedDelay(event contracts.PredictedDelayV2) {
+func (s *Store) UpsertPredictedDelay(event contracts.PredictedDelay) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := delayV2Key(event.TripID, event.StationID)
+	key := delayKey(event.TripID, event.StationID)
 	s.predicted[key] = predictedDelayEntry{
 		value:     event,
 		updatedAt: s.now().UTC(),
@@ -124,7 +124,7 @@ func (s *Store) PruneExpired() (int, int, int) {
 	return s.pruneExpiredLocked(s.now().UTC())
 }
 
-func (s *Store) Snapshot() contracts.RealtimeSnapshotV2 {
+func (s *Store) Snapshot() contracts.RealtimeSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -139,7 +139,7 @@ func (s *Store) Snapshot() contracts.RealtimeSnapshotV2 {
 		return positions[i].Key < positions[j].Key
 	})
 
-	observed := make([]contracts.ObservedDelayV2, 0, len(s.observed))
+	observed := make([]contracts.ObservedDelay, 0, len(s.observed))
 	for _, entry := range s.observed {
 		observed = append(observed, entry.value)
 	}
@@ -153,7 +153,7 @@ func (s *Store) Snapshot() contracts.RealtimeSnapshotV2 {
 		return observed[i].ObservedTime < observed[j].ObservedTime
 	})
 
-	predicted := make([]contracts.PredictedDelayV2, 0, len(s.predicted))
+	predicted := make([]contracts.PredictedDelay, 0, len(s.predicted))
 	for _, entry := range s.predicted {
 		predicted = append(predicted, entry.value)
 	}
@@ -167,12 +167,12 @@ func (s *Store) Snapshot() contracts.RealtimeSnapshotV2 {
 		return predicted[i].GeneratedAt < predicted[j].GeneratedAt
 	})
 
-	return contracts.RealtimeSnapshotV2{
+	return contracts.RealtimeSnapshot{
 		GeneratedAt:     now.Format(time.RFC3339Nano),
 		Positions:       positions,
 		ObservedDelays:  observed,
 		PredictedDelays: predicted,
-		Meta: contracts.RealtimeSnapshotMetaV2{
+		Meta: contracts.RealtimeSnapshotMeta{
 			PositionsCount:       len(positions),
 			ObservedDelaysCount:  len(observed),
 			PredictedDelaysCount: len(predicted),
@@ -224,6 +224,6 @@ func positionKey(voznjaBusID, gbr *int64) string {
 	return "unknown"
 }
 
-func delayV2Key(tripID string, stationID int64) string {
+func delayKey(tripID string, stationID int64) string {
 	return fmt.Sprintf("%s:%d", tripID, stationID)
 }

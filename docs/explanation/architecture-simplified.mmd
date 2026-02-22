@@ -1,63 +1,18 @@
-graph TB
-    subgraph "Data Sources"
-        API1["/autobusi<br/>(live positions)"]
-        API2["/stanice<br/>(stations)"]
-        API3["/voznired<br/>(schedules)"]
-    end
+flowchart LR
+  API[/AUTOTROLEJ /autobusi/] --> ING[Ingester]
+  ING --> RAW[(bus-positions-raw)]
 
-    subgraph "Ingestion Layer"
-        Ingester[Ingester Service<br/>Go - polls every 30s]
-    end
+  RAW --> PROC[Processor tracker]
+  PROC --> BRO[(Bronze positions.parquet)]
+  PROC --> SOBS[(Silver observed_delays.parquet)]
+  PROC --> SPRED[(Silver predicted_delays.parquet)]
+  PROC --> TOBS[(bus-delay-observed)]
+  PROC --> TPRED[(bus-delay-predicted)]
 
-    subgraph "Message Broker"
-        T1["Redpanda Topic:<br/>bus-positions-raw"]
-        T2["Redpanda Topic:<br/>bus-delays"]
-    end
+  TOBS --> AGG[Aggregator]
+  AGG --> GOLD[(Gold stats.parquet)]
 
-    subgraph "Processing Layer"
-        Processor[Processor Service<br/>Go - stream processor]
-        Aggregator[Aggregator Service<br/>Go - windowed agg]
-    end
-
-    subgraph "Storage - Medallion Architecture"
-        Bronze["🥉 Bronze<br/>data/bronze/YYYY-MM-DD/<br/>positions.parquet<br/>(raw events)"]
-        Silver["🥈 Silver<br/>data/silver/YYYY-MM-DD/<br/>delays.parquet<br/>(enriched + calculated)"]
-        Gold["🥇 Gold<br/>data/gold/YYYY-MM-DD/<br/>stats.parquet<br/>(hourly aggregates)"]
-    end
-
-    subgraph "Observability"
-        Prom[Prometheus<br/>metrics scraping]
-        Graf[Grafana<br/>dashboards]
-    end
-
-    %% Data flow
-    API1 -->|HTTP poll| Ingester
-    API2 -->|load on startup| Processor
-    API3 -->|load on startup| Processor
-    
-    Ingester -->|publish raw JSON| T1
-    T1 -->|consume| Processor
-    
-    Processor -->|write| Bronze
-    Processor -->|calculate delays| Silver
-    Processor -->|publish| T2
-    
-    T2 -->|consume| Aggregator
-    Aggregator -->|write stats| Gold
-
-    %% Metrics
-    Ingester -.->|expose metrics| Prom
-    Processor -.->|expose metrics| Prom
-    Aggregator -.->|expose metrics| Prom
-    Prom -.->|query| Graf
-
-    %% Styling
-    classDef storage fill:#e1f5ff,stroke:#0366d6
-    classDef service fill:#fff5e1,stroke:#d97706
-    classDef broker fill:#f0e6ff,stroke:#8b5cf6
-    classDef observability fill:#e6ffe6,stroke:#059669
-    
-    class Bronze,Silver,Gold storage
-    class Ingester,Processor,Aggregator service
-    class T1,T2 broker
-    class Prom,Graf observability
+  TOBS --> RT[Realtime]
+  TPRED --> RT
+  RT --> SNAP[/v1/snapshot/]
+  RT --> WS[/v1/ws/]

@@ -55,18 +55,18 @@ func ParsePositionsRecord(payload []byte, observedAt time.Time) ([]contracts.Rea
 	return positions, invalid, nil
 }
 
-func ParseObservedDelayRecord(payload []byte) (contracts.ObservedDelayV2, error) {
-	var event contracts.ObservedDelayV2
+func ParseObservedDelayRecord(payload []byte) (contracts.ObservedDelay, error) {
+	var event contracts.ObservedDelay
 	if err := json.Unmarshal(payload, &event); err != nil {
-		return contracts.ObservedDelayV2{}, fmt.Errorf("unmarshal observed delay payload: %w", err)
+		return contracts.ObservedDelay{}, fmt.Errorf("unmarshal observed delay payload: %w", err)
 	}
 	return event, nil
 }
 
-func ParsePredictedDelayRecord(payload []byte) (contracts.PredictedDelayV2, error) {
-	var event contracts.PredictedDelayV2
+func ParsePredictedDelayRecord(payload []byte) (contracts.PredictedDelay, error) {
+	var event contracts.PredictedDelay
 	if err := json.Unmarshal(payload, &event); err != nil {
-		return contracts.PredictedDelayV2{}, fmt.Errorf("unmarshal predicted delay payload: %w", err)
+		return contracts.PredictedDelay{}, fmt.Errorf("unmarshal predicted delay payload: %w", err)
 	}
 	return event, nil
 }

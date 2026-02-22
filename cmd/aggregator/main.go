@@ -25,7 +25,7 @@ import (
 
 const (
 	defaultBrokers       = "localhost:19092"
-	defaultInputTopic    = contracts.TopicBusDelayObservedV2
+	defaultInputTopic    = contracts.TopicBusDelayObserved
 	defaultConsumerGroup = "arrival-aggregator"
 	defaultGoldDir       = "data/gold"
 	defaultMetricsAddr   = ":9103"
@@ -136,7 +136,7 @@ func newAggregatorMetrics() aggregatorMetrics {
 }
 
 func consumeDelayRecord(state map[aggregatorlogic.AggregateKey]*aggregatorlogic.AggregateBucket, rec *kgo.Record, onTimeSeconds int) error {
-	var event contracts.ObservedDelayV2
+	var event contracts.ObservedDelay
 	if err := json.Unmarshal(rec.Value, &event); err != nil {
 		return fmt.Errorf("unmarshal observed delay event: %w", err)
 	}

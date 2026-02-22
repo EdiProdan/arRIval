@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type v2VehicleState struct {
+type vehicleState struct {
 	TripID                         string
 	LastObservedSeq                int64
 	HasProgress                    bool
@@ -16,14 +16,14 @@ type v2VehicleState struct {
 	ConsecutiveBackwardProgression int
 }
 
-func newV2VehicleState(tripID string) *v2VehicleState {
-	return &v2VehicleState{
+func newVehicleState(tripID string) *vehicleState {
+	return &vehicleState{
 		TripID:     tripID,
 		EmittedSeq: make(map[int64]struct{}),
 	}
 }
 
-func (s *v2VehicleState) updateSmoothedDelay(delaySeconds int64, alpha float64) int64 {
+func (s *vehicleState) updateSmoothedDelay(delaySeconds int64, alpha float64) int64 {
 	delay := float64(delaySeconds)
 	if !s.HasSmoothedDelay {
 		s.SmoothedDelaySeconds = delay
@@ -35,18 +35,18 @@ func (s *v2VehicleState) updateSmoothedDelay(delaySeconds int64, alpha float64) 
 	return int64(math.Round(s.SmoothedDelaySeconds))
 }
 
-func (t *V2Tracker) resetState(voznjaBusID int64) {
+func (t *Tracker) resetState(voznjaBusID int64) {
 	delete(t.stateByVoznjaBusID, voznjaBusID)
 }
 
-func (t *V2Tracker) stateForVoznjaBusID(voznjaBusID int64) *v2VehicleState {
+func (t *Tracker) stateForVoznjaBusID(voznjaBusID int64) *vehicleState {
 	state, ok := t.stateByVoznjaBusID[voznjaBusID]
 	if ok {
 		return state
 	}
 
 	tripID := t.tripIDResolver(voznjaBusID)
-	state = newV2VehicleState(tripID)
+	state = newVehicleState(tripID)
 	t.stateByVoznjaBusID[voznjaBusID] = state
 	return state
 }

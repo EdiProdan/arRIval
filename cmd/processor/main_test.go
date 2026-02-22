@@ -20,7 +20,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-func TestProcessRecordV2Fanout(t *testing.T) {
+func TestProcessRecordFanout(t *testing.T) {
 	metrics := testProcessorMetrics()
 	bw := &bronzeWriterStub{}
 	ow := &observedWriterStub{}
@@ -28,9 +28,9 @@ func TestProcessRecordV2Fanout(t *testing.T) {
 	publisher := &publishStub{}
 
 	tracker := &trackerStub{
-		outputs: []processorlogic.V2TrackOutput{
+		outputs: []processorlogic.TrackOutput{
 			{
-				Observed: []contracts.ObservedDelayV2{
+				Observed: []contracts.ObservedDelay{
 					{
 						TripID:         "1001",
 						VoznjaBusID:    1001,
@@ -43,10 +43,10 @@ func TestProcessRecordV2Fanout(t *testing.T) {
 						ObservedTime:   "2026-02-21T12:01:00Z",
 						DelaySeconds:   60,
 						DistanceM:      7.5,
-						TrackerVersion: "v2",
+						TrackerVersion: "current",
 					},
 				},
-				Predicted: []contracts.PredictedDelayV2{
+				Predicted: []contracts.PredictedDelay{
 					{
 						TripID:                "1001",
 						VoznjaBusID:           1001,
@@ -59,7 +59,7 @@ func TestProcessRecordV2Fanout(t *testing.T) {
 						PredictedTime:         "2026-02-21T12:06:00Z",
 						PredictedDelaySeconds: 60,
 						GeneratedAt:           "2026-02-21T12:01:00Z",
-						TrackerVersion:        "v2",
+						TrackerVersion:        "current",
 					},
 					{
 						TripID:                "1001",
@@ -73,7 +73,7 @@ func TestProcessRecordV2Fanout(t *testing.T) {
 						PredictedTime:         "2026-02-21T12:11:00Z",
 						PredictedDelaySeconds: 60,
 						GeneratedAt:           "2026-02-21T12:01:00Z",
-						TrackerVersion:        "v2",
+						TrackerVersion:        "current",
 					},
 				},
 			},
@@ -93,8 +93,8 @@ func TestProcessRecordV2Fanout(t *testing.T) {
 		pw,
 		tracker,
 		publisher.publish,
-		contracts.TopicBusDelayObservedV2,
-		contracts.TopicBusDelayPredictedV2,
+		contracts.TopicBusDelayObserved,
+		contracts.TopicBusDelayPredicted,
 		metrics,
 		rec,
 	)
@@ -119,10 +119,10 @@ func TestProcessRecordV2Fanout(t *testing.T) {
 	if len(publisher.records) != 3 {
 		t.Fatalf("published records = %d, want 3", len(publisher.records))
 	}
-	if publisher.records[0].Topic != contracts.TopicBusDelayObservedV2 {
-		t.Fatalf("first topic = %q, want %q", publisher.records[0].Topic, contracts.TopicBusDelayObservedV2)
+	if publisher.records[0].Topic != contracts.TopicBusDelayObserved {
+		t.Fatalf("first topic = %q, want %q", publisher.records[0].Topic, contracts.TopicBusDelayObserved)
 	}
-	if publisher.records[1].Topic != contracts.TopicBusDelayPredictedV2 || publisher.records[2].Topic != contracts.TopicBusDelayPredictedV2 {
+	if publisher.records[1].Topic != contracts.TopicBusDelayPredicted || publisher.records[2].Topic != contracts.TopicBusDelayPredicted {
 		t.Fatalf("predicted topics mismatch: got %q, %q", publisher.records[1].Topic, publisher.records[2].Topic)
 	}
 	if got := counterValue(t, metrics.observedPublished); got != 1 {
@@ -141,8 +141,8 @@ func TestProcessRecordSkipIncrementsReasonMetric(t *testing.T) {
 	publisher := &publishStub{}
 
 	tracker := &trackerStub{
-		outputs: []processorlogic.V2TrackOutput{
-			{SkipReason: processorlogic.V2SkipReasonMissingCoordinates},
+		outputs: []processorlogic.TrackOutput{
+			{SkipReason: processorlogic.SkipReasonMissingCoordinates},
 		},
 	}
 
@@ -157,8 +157,8 @@ func TestProcessRecordSkipIncrementsReasonMetric(t *testing.T) {
 		pw,
 		tracker,
 		publisher.publish,
-		contracts.TopicBusDelayObservedV2,
-		contracts.TopicBusDelayPredictedV2,
+		contracts.TopicBusDelayObserved,
+		contracts.TopicBusDelayPredicted,
 		metrics,
 		rec,
 	)
@@ -174,7 +174,7 @@ func TestProcessRecordSkipIncrementsReasonMetric(t *testing.T) {
 	if len(ow.rows) != 0 || len(pw.rows) != 0 || len(publisher.records) != 0 {
 		t.Fatalf("unexpected outputs: observed=%d predicted=%d published=%d", len(ow.rows), len(pw.rows), len(publisher.records))
 	}
-	reason := string(processorlogic.V2SkipReasonMissingCoordinates)
+	reason := string(processorlogic.SkipReasonMissingCoordinates)
 	if got := counterValue(t, metrics.trackerSkips.WithLabelValues(reason)); got != 1 {
 		t.Fatalf("trackerSkips[%q] = %f, want 1", reason, got)
 	}
@@ -182,7 +182,7 @@ func TestProcessRecordSkipIncrementsReasonMetric(t *testing.T) {
 
 func TestProcessRecordDuplicateStationProgressionDoesNotRepublish(t *testing.T) {
 	store := buildProcessorTestStore(t)
-	realTracker := processorlogic.NewV2Tracker(store, processorlogic.V2TrackerConfig{
+	realTracker := processorlogic.NewTracker(store, processorlogic.TrackerConfig{
 		ServiceLocation: time.UTC,
 	})
 
@@ -210,8 +210,8 @@ func TestProcessRecordDuplicateStationProgressionDoesNotRepublish(t *testing.T) 
 		pw,
 		realTracker,
 		publisher.publish,
-		contracts.TopicBusDelayObservedV2,
-		contracts.TopicBusDelayPredictedV2,
+		contracts.TopicBusDelayObserved,
+		contracts.TopicBusDelayPredicted,
 		metrics,
 		first,
 	)
@@ -229,8 +229,8 @@ func TestProcessRecordDuplicateStationProgressionDoesNotRepublish(t *testing.T) 
 		pw,
 		realTracker,
 		publisher.publish,
-		contracts.TopicBusDelayObservedV2,
-		contracts.TopicBusDelayPredictedV2,
+		contracts.TopicBusDelayObserved,
+		contracts.TopicBusDelayPredicted,
 		metrics,
 		second,
 	)
@@ -241,7 +241,7 @@ func TestProcessRecordDuplicateStationProgressionDoesNotRepublish(t *testing.T) 
 		t.Fatalf("secondPublished = %d, want 0", secondPublished)
 	}
 
-	reason := string(processorlogic.V2SkipReasonDuplicateStationSeq)
+	reason := string(processorlogic.SkipReasonDuplicateStationSeq)
 	if got := counterValue(t, metrics.trackerSkips.WithLabelValues(reason)); got != 1 {
 		t.Fatalf("trackerSkips[%q] = %f, want 1", reason, got)
 	}
@@ -249,7 +249,7 @@ func TestProcessRecordDuplicateStationProgressionDoesNotRepublish(t *testing.T) 
 
 func TestProcessRecordUsesKafkaTimestampForObservedAndGeneratedTimes(t *testing.T) {
 	store := buildProcessorTestStore(t)
-	realTracker := processorlogic.NewV2Tracker(store, processorlogic.V2TrackerConfig{
+	realTracker := processorlogic.NewTracker(store, processorlogic.TrackerConfig{
 		ServiceLocation: time.UTC,
 	})
 
@@ -273,8 +273,8 @@ func TestProcessRecordUsesKafkaTimestampForObservedAndGeneratedTimes(t *testing.
 		pw,
 		realTracker,
 		publisher.publish,
-		contracts.TopicBusDelayObservedV2,
-		contracts.TopicBusDelayPredictedV2,
+		contracts.TopicBusDelayObserved,
+		contracts.TopicBusDelayPredicted,
 		metrics,
 		rec,
 	)
@@ -298,12 +298,12 @@ func TestProcessRecordUsesKafkaTimestampForObservedAndGeneratedTimes(t *testing.
 	}
 }
 
-func TestSilverWritersUseV2Filenames(t *testing.T) {
+func TestSilverWritersUseCurrentFilenames(t *testing.T) {
 	baseDir := t.TempDir()
 	date := "2026-02-21"
 
 	ow := &silverObservedDailyWriter{baseDir: baseDir}
-	if err := ow.Write(silverObservedDelayV2Row{
+	if err := ow.Write(silverObservedDelayRow{
 		IngestedAt:   "2026-02-21T12:01:00Z",
 		IngestedDate: date,
 	}); err != nil {
@@ -314,7 +314,7 @@ func TestSilverWritersUseV2Filenames(t *testing.T) {
 	}
 
 	pw := &silverPredictedDailyWriter{baseDir: baseDir}
-	if err := pw.Write(silverPredictedDelayV2Row{
+	if err := pw.Write(silverPredictedDelayRow{
 		IngestedAt:   "2026-02-21T12:01:00Z",
 		IngestedDate: date,
 	}); err != nil {
@@ -350,7 +350,7 @@ func TestEnsureTopicAlreadyExistsIsAllowed(t *testing.T) {
 		return res, nil
 	}
 
-	if err := ensureTopic(context.Background(), nil, contracts.TopicBusDelayObservedV2); err != nil {
+	if err := ensureTopic(context.Background(), nil, contracts.TopicBusDelayObserved); err != nil {
 		t.Fatalf("ensureTopic should allow existing topic, got err=%v", err)
 	}
 }
@@ -370,7 +370,7 @@ func TestEnsureTopicReturnsKafkaError(t *testing.T) {
 		return res, nil
 	}
 
-	err := ensureTopic(context.Background(), nil, contracts.TopicBusDelayPredictedV2)
+	err := ensureTopic(context.Background(), nil, contracts.TopicBusDelayPredicted)
 	if err == nil {
 		t.Fatalf("ensureTopic error = nil, want non-nil")
 	}
@@ -395,15 +395,15 @@ func TestEnsureTopicsCreatesAllConfiguredTopics(t *testing.T) {
 		return res, nil
 	}
 
-	err := ensureTopics(context.Background(), nil, contracts.TopicBusDelayObservedV2, contracts.TopicBusDelayPredictedV2)
+	err := ensureTopics(context.Background(), nil, contracts.TopicBusDelayObserved, contracts.TopicBusDelayPredicted)
 	if err != nil {
 		t.Fatalf("ensureTopics: %v", err)
 	}
 	if len(requested) != 2 {
 		t.Fatalf("requested topics len=%d, want 2", len(requested))
 	}
-	if requested[0] != contracts.TopicBusDelayObservedV2 || requested[1] != contracts.TopicBusDelayPredictedV2 {
-		t.Fatalf("requested topics = %v, want [%s %s]", requested, contracts.TopicBusDelayObservedV2, contracts.TopicBusDelayPredictedV2)
+	if requested[0] != contracts.TopicBusDelayObserved || requested[1] != contracts.TopicBusDelayPredicted {
+		t.Fatalf("requested topics = %v, want [%s %s]", requested, contracts.TopicBusDelayObserved, contracts.TopicBusDelayPredicted)
 	}
 }
 
@@ -417,32 +417,32 @@ func (s *bronzeWriterStub) Write(row bronzePositionRow) error {
 }
 
 type observedWriterStub struct {
-	rows []silverObservedDelayV2Row
+	rows []silverObservedDelayRow
 }
 
-func (s *observedWriterStub) Write(row silverObservedDelayV2Row) error {
+func (s *observedWriterStub) Write(row silverObservedDelayRow) error {
 	s.rows = append(s.rows, row)
 	return nil
 }
 
 type predictedWriterStub struct {
-	rows []silverPredictedDelayV2Row
+	rows []silverPredictedDelayRow
 }
 
-func (s *predictedWriterStub) Write(row silverPredictedDelayV2Row) error {
+func (s *predictedWriterStub) Write(row silverPredictedDelayRow) error {
 	s.rows = append(s.rows, row)
 	return nil
 }
 
 type trackerStub struct {
-	outputs []processorlogic.V2TrackOutput
-	calls   []processorlogic.V2TrackInput
+	outputs []processorlogic.TrackOutput
+	calls   []processorlogic.TrackInput
 }
 
-func (s *trackerStub) Track(input processorlogic.V2TrackInput) processorlogic.V2TrackOutput {
+func (s *trackerStub) Track(input processorlogic.TrackInput) processorlogic.TrackOutput {
 	s.calls = append(s.calls, input)
 	if len(s.outputs) == 0 {
-		return processorlogic.V2TrackOutput{}
+		return processorlogic.TrackOutput{}
 	}
 	out := s.outputs[0]
 	s.outputs = s.outputs[1:]

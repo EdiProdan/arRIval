@@ -10,7 +10,7 @@ import (
 
 func TestConsumeEventInvalidObservedTime(t *testing.T) {
 	state := make(map[AggregateKey]*AggregateBucket)
-	err := ConsumeEvent(state, contracts.ObservedDelayV2{
+	err := ConsumeEvent(state, contracts.ObservedDelay{
 		BrojLinije:   "2A",
 		ObservedTime: "invalid",
 		DelaySeconds: 10,
@@ -25,7 +25,7 @@ func TestConsumeEventInvalidObservedTime(t *testing.T) {
 
 func TestConsumeEventBlankRouteFallsBackToUnknown(t *testing.T) {
 	state := make(map[AggregateKey]*AggregateBucket)
-	err := ConsumeEvent(state, contracts.ObservedDelayV2{
+	err := ConsumeEvent(state, contracts.ObservedDelay{
 		BrojLinije:   " ",
 		ObservedTime: "2025-01-02T10:15:00Z",
 		DelaySeconds: 120,
@@ -49,7 +49,7 @@ func TestConsumeEventBlankRouteFallsBackToUnknown(t *testing.T) {
 
 func TestComputeRowsByDateStats(t *testing.T) {
 	state := make(map[AggregateKey]*AggregateBucket)
-	events := []contracts.ObservedDelayV2{
+	events := []contracts.ObservedDelay{
 		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:01:00Z", DelaySeconds: -120},
 		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:02:00Z", DelaySeconds: 0},
 		{BrojLinije: "2A", ObservedTime: "2025-01-02T10:03:00Z", DelaySeconds: 60},

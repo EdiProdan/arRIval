@@ -76,7 +76,7 @@ func TestParsePositionsRecord(t *testing.T) {
 }
 
 func TestParseObservedDelayRecord(t *testing.T) {
-	payload, err := json.Marshal(contracts.ObservedDelayV2{
+	payload, err := json.Marshal(contracts.ObservedDelay{
 		TripID:         "trip-121",
 		VoznjaBusID:    121,
 		LinVarID:       "L1A",
@@ -88,7 +88,7 @@ func TestParseObservedDelayRecord(t *testing.T) {
 		ObservedTime:   "2026-02-18T11:10:00Z",
 		DelaySeconds:   300,
 		DistanceM:      15,
-		TrackerVersion: "v2",
+		TrackerVersion: "current",
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
@@ -104,7 +104,7 @@ func TestParseObservedDelayRecord(t *testing.T) {
 }
 
 func TestParsePredictedDelayRecord(t *testing.T) {
-	payload, err := json.Marshal(contracts.PredictedDelayV2{
+	payload, err := json.Marshal(contracts.PredictedDelay{
 		TripID:                "trip-121",
 		VoznjaBusID:           121,
 		LinVarID:              "L1A",
@@ -116,7 +116,7 @@ func TestParsePredictedDelayRecord(t *testing.T) {
 		PredictedTime:         "2026-02-18T11:17:00Z",
 		PredictedDelaySeconds: 300,
 		GeneratedAt:           "2026-02-18T11:10:00Z",
-		TrackerVersion:        "v2",
+		TrackerVersion:        "current",
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)

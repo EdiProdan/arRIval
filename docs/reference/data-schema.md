@@ -3,14 +3,14 @@
 This document defines the **practical data contract** used by this project.
 It is intended for programming work: parsing, validation, joins, enrichment, and delay-related modeling.
 
-For V2 delay runtime payload contracts, use:
-- [`delay-v2-contract.md`](delay-v2-contract.md)
+For delay runtime payload contracts, use:
+- [`delay-contract.md`](delay-contract.md)
 
 ## 1) Scope and Trust Model
 
 This project uses a **dual-truth** schema model:
 
-1. **Formal API contract** from `diataxis_docs/reference/api/openapi-preview.json` (OpenAPI preview)
+1. **Formal API contract** from `docs/reference/api/openapi-preview.json` (OpenAPI preview)
 2. **Observed payloads** from cached JSON and EDA workflows in `eda/data_raw/*` and notebooks
 
 When they differ, implementation should prefer **observed runtime/static payloads** for ingestion logic, and keep API-model compatibility where possible.
@@ -274,7 +274,7 @@ At enrichment time:
 
 ## Appendix A: Current Source Files Used to Derive This Reference
 
-- `diataxis_docs/reference/api/openapi-preview.json`
+- `docs/reference/api/openapi-preview.json`
 - `eda/autotrolej_live_eda.ipynb`
 - `eda/autotrolej_static_eda.ipynb`
 - `eda/data_raw/linije.json`

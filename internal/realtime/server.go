@@ -105,14 +105,14 @@ func (s *Server) HandleObservedDelayRecord(topic string, payload []byte, observe
 	s.store.PruneExpired()
 	s.emitStateCounts()
 
-	payloadBytes, err := marshalEnvelope(contracts.RealtimeEventDelayObservedUpdateV2, observedAt.UTC(), contracts.RealtimeObservedDelayUpdate{
+	payloadBytes, err := marshalEnvelope(contracts.RealtimeEventDelayObservedUpdate, observedAt.UTC(), contracts.RealtimeObservedDelayUpdate{
 		ObservedDelay: event,
 	})
 	if err != nil {
 		return err
 	}
 
-	s.hub.Broadcast(contracts.RealtimeEventDelayObservedUpdateV2, payloadBytes)
+	s.hub.Broadcast(contracts.RealtimeEventDelayObservedUpdate, payloadBytes)
 	return nil
 }
 
@@ -130,14 +130,14 @@ func (s *Server) HandlePredictedDelayRecord(topic string, payload []byte, observ
 	s.store.PruneExpired()
 	s.emitStateCounts()
 
-	payloadBytes, err := marshalEnvelope(contracts.RealtimeEventDelayPredictionUpdateV2, observedAt.UTC(), contracts.RealtimePredictedDelayUpdate{
+	payloadBytes, err := marshalEnvelope(contracts.RealtimeEventDelayPredictionUpdate, observedAt.UTC(), contracts.RealtimePredictedDelayUpdate{
 		PredictedDelay: event,
 	})
 	if err != nil {
 		return err
 	}
 
-	s.hub.Broadcast(contracts.RealtimeEventDelayPredictionUpdateV2, payloadBytes)
+	s.hub.Broadcast(contracts.RealtimeEventDelayPredictionUpdate, payloadBytes)
 	return nil
 }
 

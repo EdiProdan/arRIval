@@ -13,12 +13,12 @@ Use this checklist when adding or updating documentation.
 
 - Prefer concise headings and command-first instructions for developer-facing docs.
 - Keep examples copy-pastable.
-- Link to canonical files in `diataxis_docs/` rather than legacy files in `docs/`.
+- Link to canonical files under `docs/`.
 - When moving content, preserve technical accuracy before improving style.
 
 ## Update checklist
 
 1. Update or add the target Diátaxis file.
-2. Update `diataxis_docs/README.md` navigation if a new page is added.
+2. Update `docs/README.md` navigation if a new page is added.
 3. Verify links from root `README.md` remain valid.
 4. If a factual contract changed, update corresponding Reference pages.

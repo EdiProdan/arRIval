@@ -1,14 +1,6 @@
 # How-to: Run the Full Stack
 
-Use this guide when you want to start, monitor, and stop the complete compose runtime.
-
-## Phase 4 cutover note
-
-As of **February 21, 2026**, the stack runs fully on V2 delay topics:
-- `bus-delay-observed-v2`
-- `bus-delay-predicted-v2`
-
-`aggregator` consumes observed V2 events only; `realtime` consumes observed + predicted V2 events.
+Use this guide to start, monitor, and stop the full compose runtime.
 
 ## Start
 
@@ -31,39 +23,36 @@ Kafka:
 
 ```bash
 docker compose exec redpanda rpk topic consume bus-positions-raw -n 1
-docker compose exec redpanda rpk topic consume bus-delay-observed-v2 -n 1
-docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1
+docker compose exec redpanda rpk topic consume bus-delay-observed -n 1
+docker compose exec redpanda rpk topic consume bus-delay-predicted -n 1
 ```
 
-Observability:
-
-- Prometheus: <http://localhost:9090/targets>
-- Grafana: <http://localhost:3000>
-
 Realtime API:
-
 - UI: <http://localhost:8080/>
 - Snapshot: <http://localhost:8080/v1/snapshot>
 - Health: <http://localhost:8080/healthz>
 - Readiness: <http://localhost:8080/readyz>
 
-Storage:
+Observability:
+- Prometheus: <http://localhost:9090/targets>
+- Grafana: <http://localhost:3000>
 
+Storage:
 - Bronze: `data/bronze/YYYY-MM-DD/positions.parquet`
-- Silver observed: `data/silver/YYYY-MM-DD/observed_delays_v2.parquet`
-- Silver predicted: `data/silver/YYYY-MM-DD/predicted_delays_v2.parquet`
+- Silver observed: `data/silver/YYYY-MM-DD/observed_delays.parquet`
+- Silver predicted: `data/silver/YYYY-MM-DD/predicted_delays.parquet`
 - Gold: `data/gold/YYYY-MM-DD/stats.parquet`
 
-## End-to-end demo path (Phase 5)
+## Demo path
 
-1. Confirm both V2 delay topics are producing messages:
+1. Confirm both delay topics produce messages.
 
 ```bash
-docker compose exec redpanda rpk topic consume bus-delay-observed-v2 -n 1
-docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1
+docker compose exec redpanda rpk topic consume bus-delay-observed -n 1
+docker compose exec redpanda rpk topic consume bus-delay-predicted -n 1
 ```
 
-2. Confirm snapshot V2 shape:
+2. Confirm snapshot fields:
 - `observed_delays`
 - `predicted_delays`
 - `meta.observed_delays_count`
@@ -71,21 +60,28 @@ docker compose exec redpanda rpk topic consume bus-delay-predicted-v2 -n 1
 
 3. Confirm UI split boards:
 - open <http://localhost:8080/>
-- verify "Observed Delays" and "Predicted Delays" sections are both present
-- confirm counts update as realtime events arrive
+- verify observed and predicted sections update
 
-4. Confirm Grafana Phase 5 panels:
-- open <http://localhost:3000> dashboard `arRIval - Minimal Operations`
-- check `Prediction Volume (V2)` panel
-- check `Tracker Lock Quality (V2)` panel
+4. Confirm Grafana panels:
+- `Prediction Volume`
+- `Tracker Lock Quality`
 
-5. Validate lock-quality reason regex before dashboard rollout:
+5. Validate lock-quality reason labels used by PromQL:
 
 ```bash
 curl -sS "http://localhost:9090/api/v1/query?query=sum%20by%20(reason)%20(rate(arrival_processor_tracker_skips_total%5B5m%5D))"
 ```
 
-If the reasons in the lock panel regex do not exactly match live labels, quality score math is silently skewed.
+## One-time migration cleanup
+
+If old artifacts still exist from previous naming:
+
+```bash
+for topic in bus-delay-observed bus-delay-predicted; do
+  docker compose exec redpanda rpk topic delete "${topic}-v2" || true
+done
+find data/silver -type f -name '*_delays_v2.parquet' -delete
+```
 
 ## Stop
 
