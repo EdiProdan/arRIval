@@ -28,7 +28,8 @@ export default function App(): JSX.Element {
     generatedAt,
     lastMessageAt,
     positions,
-    delays,
+    observedDelays,
+    predictedDelays,
     refreshSnapshot
   } = useRealtimeFeed();
 
@@ -45,7 +46,8 @@ export default function App(): JSX.Element {
             {statusLabel(connection)}
           </span>
           <span data-testid="positions-count">{positions.length} positions</span>
-          <span>{delays.length} delays</span>
+          <span>{observedDelays.length} observed delays</span>
+          <span>{predictedDelays.length} predicted delays</span>
           <button onClick={() => void refreshSnapshot()} disabled={loadingSnapshot} data-testid="refresh-button">
             {loadingSnapshot ? "Refreshing..." : "Refresh snapshot"}
           </button>
@@ -62,7 +64,7 @@ export default function App(): JSX.Element {
 
       <main className="layout-grid">
         <MapPanel positions={positions} stale={stale} />
-        <DelayBoard delays={delays} stale={stale} />
+        <DelayBoard observedDelays={observedDelays} predictedDelays={predictedDelays} stale={stale} />
       </main>
 
       <footer className="footer-meta">
