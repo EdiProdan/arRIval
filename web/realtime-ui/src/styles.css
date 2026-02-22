@@ -35,7 +35,10 @@ body {
 .app-shell {
   width: min(1280px, 94vw);
   margin: 1.2rem auto 2rem;
-  display: grid;
+  min-height: calc(100vh - 3.2rem);
+  min-height: calc(100dvh - 3.2rem);
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
@@ -139,10 +142,13 @@ button:disabled {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 1rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .layout-grid--single {
   grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .panel {
@@ -153,6 +159,7 @@ button:disabled {
   overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 .panel--stale {
@@ -181,6 +188,7 @@ button:disabled {
 
 .map-frame {
   min-height: 430px;
+  height: 100%;
 }
 
 .board-header {

@@ -35,11 +35,6 @@ export default function App(): JSX.Element {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <h1>arRIval Realtime</h1>
-          <p>Public read-only operations view</p>
-        </div>
-
         <div className="topbar-meta">
           <span className={`status-badge status-${connection}`} data-testid="status-badge">
             {statusLabel(connection)}

@@ -247,10 +247,12 @@ export function MapPanel({ positions, observedDelays, predictedDelays, stale }: 
       attributionControl: true
     }).setView(RIJEKA_CENTER, 12);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  maxZoom: 20,
+  subdomains: "abcd",
+  attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
+}).addTo(map);
+
 
     const stationMarkers = L.layerGroup().addTo(map);
     const busMarkers = L.layerGroup().addTo(map);
