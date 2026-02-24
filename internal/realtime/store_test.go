@@ -271,3 +271,122 @@ func TestStoreObservedUpsertRemovesProgressedPredictions(t *testing.T) {
 		}
 	}
 }
+
+func TestStorePredictedUpsertPreservesSameTripStationWithDifferentSeq(t *testing.T) {
+	now := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
+	store := NewStore(StoreConfig{
+		Now: func() time.Time { return now },
+	})
+
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     5,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "current",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     9,
+		GeneratedAt:    "2026-02-18T10:01:00Z",
+		TrackerVersion: "current",
+	})
+
+	snapshot := store.Snapshot()
+	if snapshot.Meta.PredictedDelaysCount != 2 {
+		t.Fatalf("PredictedDelaysCount = %d, want 2", snapshot.Meta.PredictedDelaysCount)
+	}
+	if snapshot.PredictedDelays[0].StationSeq != 5 || snapshot.PredictedDelays[1].StationSeq != 9 {
+		t.Fatalf("predicted seqs = [%d,%d], want [5,9]", snapshot.PredictedDelays[0].StationSeq, snapshot.PredictedDelays[1].StationSeq)
+	}
+}
+
+func TestStoreObservedUpsertPreservesSameTripStationWithDifferentSeq(t *testing.T) {
+	now := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
+	store := NewStore(StoreConfig{
+		Now: func() time.Time { return now },
+	})
+
+	store.UpsertObservedDelay(contracts.ObservedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     5,
+		ObservedTime:   "2026-02-18T10:00:00Z",
+		TrackerVersion: "current",
+	})
+	store.UpsertObservedDelay(contracts.ObservedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     9,
+		ObservedTime:   "2026-02-18T10:01:00Z",
+		TrackerVersion: "current",
+	})
+
+	snapshot := store.Snapshot()
+	if snapshot.Meta.ObservedDelaysCount != 2 {
+		t.Fatalf("ObservedDelaysCount = %d, want 2", snapshot.Meta.ObservedDelaysCount)
+	}
+	if snapshot.ObservedDelays[0].StationSeq != 5 || snapshot.ObservedDelays[1].StationSeq != 9 {
+		t.Fatalf("observed seqs = [%d,%d], want [5,9]", snapshot.ObservedDelays[0].StationSeq, snapshot.ObservedDelays[1].StationSeq)
+	}
+}
+
+func TestStoreObservedUpsertRemovesOnlyProgressedPredictionsForLoopStation(t *testing.T) {
+	now := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
+	store := NewStore(StoreConfig{
+		Now: func() time.Time { return now },
+	})
+
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     5,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "current",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     9,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "current",
+	})
+	store.UpsertPredictedDelay(contracts.PredictedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      520,
+		StationSeq:     10,
+		GeneratedAt:    "2026-02-18T10:00:00Z",
+		TrackerVersion: "current",
+	})
+
+	store.UpsertObservedDelay(contracts.ObservedDelay{
+		TripID:         "trip-loop",
+		VoznjaBusID:    121,
+		StationID:      410,
+		StationSeq:     5,
+		ObservedTime:   "2026-02-18T10:02:00Z",
+		TrackerVersion: "current",
+	})
+
+	snapshot := store.Snapshot()
+	if snapshot.Meta.PredictedDelaysCount != 2 {
+		t.Fatalf("PredictedDelaysCount = %d, want 2", snapshot.Meta.PredictedDelaysCount)
+	}
+
+	for _, event := range snapshot.PredictedDelays {
+		if event.TripID != "trip-loop" {
+			continue
+		}
+		if event.StationSeq <= 5 {
+			t.Fatalf("found stale predicted entry: trip=%s seq=%d", event.TripID, event.StationSeq)
+		}
+	}
+}

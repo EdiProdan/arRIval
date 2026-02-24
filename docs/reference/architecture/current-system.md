@@ -4,8 +4,6 @@
 
 This page documents the runtime architecture that is currently deployed in local compose and reflected in source code.
 
-Last verified: **February 22, 2026**.
-
 ## 2. Runtime topology
 
 Core services:
@@ -78,11 +76,20 @@ Responsibilities:
 Responsibilities:
 - consume raw + observed + predicted topics
 - keep in-memory state with TTL pruning
-- serve:
-  - `GET /healthz`
-  - `GET /readyz`
-  - `GET /v1/snapshot`
-  - `GET /v1/ws`
+- serve health/readiness plus realtime and station-read-model endpoints
+
+Realtime endpoint status:
+
+| Endpoint | Status | Purpose |
+|---|---|---|
+| `GET /healthz` | core | liveness probe |
+| `GET /readyz` | core | readiness probe |
+| `GET /v1/snapshot` | core | canonical realtime snapshot |
+| `GET /v1/ws` | core | canonical realtime websocket stream |
+| `GET /v1/stations` | core | static station reference for map bootstrap |
+| `GET /v1/station-arrivals` | core | station next-arrivals query (live ETA + scheduled fallback) |
+| `GET /v1/station-timetable` | deprecated | compatibility alias for `/v1/station-arrivals` |
+| `GET /v1/line-map` | deprecated | compatibility endpoint during map-label migration |
 
 Websocket message types:
 - `positions_batch`
@@ -123,6 +130,8 @@ Implements snapshot state store, websocket hub, and payload parsing.
 Primary environment variables:
 - `ARRIVAL_KAFKA_BROKERS`
 - `ARRIVAL_KAFKA_TOPIC` (raw topic)
+- `ARRIVAL_INGESTER_POLL_INTERVAL` (base poll cadence, default `30s`)
+- `ARRIVAL_INGESTER_MAX_BACKOFF` (ingester retry cap, default `2m`)
 - `ARRIVAL_KAFKA_DELAY_OBSERVED_TOPIC` (default `bus-delay-observed`)
 - `ARRIVAL_KAFKA_DELAY_PREDICTED_TOPIC` (default `bus-delay-predicted`)
 - `ARRIVAL_PROCESSOR_GROUP`

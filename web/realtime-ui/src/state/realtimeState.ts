@@ -16,16 +16,16 @@ export interface RealtimeCollections {
   predictedByKey: Record<string, PredictedDelay>;
 }
 
-export function delayKey(tripID: string, stationID: number): string {
-  return `${tripID}:${stationID}`;
+export function delayKey(tripID: string, stationID: number, stationSeq: number): string {
+  return `${tripID}:${stationID}:${stationSeq}`;
 }
 
 function observedDelayKey(delay: ObservedDelay): string {
-  return delayKey(delay.trip_id, delay.station_id);
+  return delayKey(delay.trip_id, delay.station_id, delay.station_seq);
 }
 
 function predictedDelayKey(delay: PredictedDelay): string {
-  return delayKey(delay.trip_id, delay.station_id);
+  return delayKey(delay.trip_id, delay.station_id, delay.station_seq);
 }
 
 function observedSeqByTrip(observedByKey: Record<string, ObservedDelay>): Record<string, number> {

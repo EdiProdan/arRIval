@@ -290,12 +290,43 @@ th {
   font-weight: 700;
 }
 
+.bus-line-pill-marker {
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bus-line-pill {
+  box-sizing: border-box;
+  min-width: 34px;
+  height: 22px;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  border: 1px solid #082634;
+  background: #0f3b4c;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 6px 14px rgba(15, 59, 76, 0.22);
+}
+
 .bus-popup-layer {
   max-width: 560px;
 }
 
+.bus-popup-layer .leaflet-popup-content-wrapper {
+  border-radius: 1rem;
+  box-shadow: 0 12px 40px rgba(15, 59, 76, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 .bus-popup-layer .leaflet-popup-content {
-  margin: 0.45rem 0.55rem;
+  margin: 0.65rem 0.75rem;
 }
 
 .station-popup-layer .leaflet-popup-content {
@@ -303,52 +334,52 @@ th {
   font-size: 0.86rem;
 }
 
-.bus-tooltip {
-  min-width: 300px;
+.station-popup {
+  min-width: min(90vw, 460px);
   color: var(--ink);
 }
 
-.bus-tooltip__title {
-  margin: 0 0 0.18rem;
+.station-popup__title {
+  margin: 0 0 0.42rem;
   font-weight: 700;
   font-size: 0.9rem;
 }
 
-.bus-tooltip__meta {
+.station-popup__loading,
+.station-popup__error,
+.station-popup__empty {
   margin: 0;
   font-size: 0.8rem;
   color: var(--ink-muted);
 }
 
-.bus-tooltip__empty {
-  margin: 0.5rem 0 0;
-  font-size: 0.82rem;
-  color: var(--ink-muted);
+.station-popup__error {
+  color: #8d1313;
 }
 
-.bus-tooltip__table-wrap {
-  margin-top: 0.5rem;
-  max-height: 220px;
+.station-popup__table-wrap {
+  margin-top: 0.12rem;
+  max-height: 260px;
   overflow: auto;
   border: 1px solid #d9e7df;
   border-radius: 0.45rem;
 }
 
-.bus-tooltip__table {
+.station-popup__table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.bus-tooltip__table th,
-.bus-tooltip__table td {
-  padding: 0.34rem 0.45rem;
+.station-popup__table th,
+.station-popup__table td {
+  padding: 0.34rem 0.44rem;
   border-bottom: 1px solid #ebf2ee;
   text-align: left;
   white-space: nowrap;
   font-size: 0.74rem;
 }
 
-.bus-tooltip__table th {
+.station-popup__table th {
   position: sticky;
   top: 0;
   background: #f4faf7;
@@ -359,24 +390,172 @@ th {
   color: var(--ink-muted);
 }
 
-.bus-tooltip__row--visited td:first-child {
+.station-popup__status--live {
   color: #0d6a54;
   font-weight: 700;
 }
 
-.bus-tooltip__row--future td:first-child {
+.station-popup__status--scheduled {
   color: #105f8a;
   font-weight: 700;
 }
 
-.bus-tooltip__delay--positive {
-  color: var(--danger);
-  font-weight: 700;
+.bus-tooltip {
+  min-width: 300px;
+  color: var(--ink);
 }
 
-.bus-tooltip__delay--early {
-  color: #0d6a54;
-  font-weight: 700;
+.bus-tooltip__empty {
+  margin: 0.6rem 0;
+  font-size: 0.84rem;
+  color: var(--ink-muted);
+}
+
+/* ── Route timeline ── */
+
+.bus-timeline {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 0.4rem 0.1rem 0.4rem 0;
+}
+
+.bus-timeline__stop {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  min-height: 32px;
+  position: relative;
+}
+
+/* Continuous vertical line via pseudo-element on the stop itself */
+.bus-timeline__stop::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+
+.bus-timeline__stop--visited::before {
+  width: 2px;
+  background: #d1d5db;
+}
+
+.bus-timeline__stop--future::before {
+  width: 3.5px;
+  background: #2563eb;
+}
+
+/* Clip the line: hide top half on first stop, bottom half on last */
+.bus-timeline__stop--first::before {
+  top: 50%;
+}
+
+.bus-timeline__stop--last::before {
+  bottom: 50%;
+}
+
+/* Boundary: last visited stop — gradient transition into blue */
+.bus-timeline__stop--boundary::before {
+  background: linear-gradient(to bottom, #d1d5db 0%, #93b4f8 50%, #2563eb 100%);
+  width: 3px;
+}
+
+/* Dot sits on top of the line */
+.bus-timeline__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  justify-self: center;
+  position: relative;
+  z-index: 1;
+}
+
+.bus-timeline__stop--visited .bus-timeline__dot {
+  background: #b0b8c1;
+  border: 2px solid #e0e4e8;
+}
+
+.bus-timeline__stop--future .bus-timeline__dot {
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 3px solid #2563eb;
+}
+
+/* Content row */
+.bus-timeline__content {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0 0.4rem 0.45rem;
+}
+
+.bus-timeline__station {
+  font-size: 0.86rem;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  line-height: 1.3;
+}
+
+.bus-timeline__stop--visited .bus-timeline__station {
+  color: #8b95a1;
+  font-weight: 450;
+}
+
+.bus-timeline__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.bus-timeline__time {
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.bus-timeline__stop--visited .bus-timeline__time {
+  color: #8b95a1;
+  font-weight: 450;
+}
+
+/* Delay badge */
+.bus-timeline__delay {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  line-height: 1.3;
+}
+
+.bus-timeline__delay--late {
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.bus-timeline__delay--early {
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.bus-timeline__delay--ontime {
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
 }
 
 .footer-meta {
@@ -403,6 +582,6 @@ th {
 
   .bus-tooltip {
     min-width: 0;
-    width: min(86vw, 500px);
+    width: min(86vw, 400px);
   }
 }

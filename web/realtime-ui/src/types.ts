@@ -42,6 +42,8 @@ export interface RealtimeSnapshotMeta {
   positions_count: number;
   observed_delays_count: number;
   predicted_delays_count: number;
+  source_interval_ms: number;
+  heartbeat_interval_ms: number;
 }
 
 export interface RealtimeSnapshot {
@@ -50,6 +52,27 @@ export interface RealtimeSnapshot {
   observed_delays: ObservedDelay[];
   predicted_delays: PredictedDelay[];
   meta: RealtimeSnapshotMeta;
+}
+
+export type StationTimetableStatus = "live" | "scheduled";
+
+export interface StationTimetableRow {
+  status: StationTimetableStatus;
+  trip_id: string;
+  line: string;
+  station_id: number;
+  station_seq: number;
+  scheduled_time: string;
+  eta_time: string;
+  delay_seconds: number | null;
+}
+
+export interface StationTimetableResponse {
+  station_id: number;
+  station_name: string;
+  generated_at: string;
+  window_minutes: number;
+  rows: StationTimetableRow[];
 }
 
 export interface RealtimePositionsBatch {

@@ -51,6 +51,7 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 5. Verify realtime API:
    - UI: `http://localhost:8080/`
    - snapshot: `curl http://localhost:8080/v1/snapshot`
+   - station arrivals: `curl "http://localhost:8080/v1/station-arrivals?station_id=100&window_minutes=60"`
    - health: `curl http://localhost:8080/healthz`
    - readiness: `curl http://localhost:8080/readyz`
 
@@ -74,6 +75,8 @@ For repository settings, protect `main` by requiring pull requests and the `CI /
 - `staticsync` runs once on startup and downloads static datasets into `data/`.
 - Bronze/Silver/Gold are bind-mounted to local `./data` for direct inspection.
 - `.env.example` defaults are Compose-first (`ARRIVAL_KAFKA_BROKERS=redpanda:9092`).
+- For lower-latency realtime UX, set `ARRIVAL_INGESTER_POLL_INTERVAL=5s` and restart `ingester` + `realtime`; this increases API/Kafka load.
+- `ARRIVAL_INGESTER_MAX_BACKOFF` controls retry cap after ingest failures (default `2m`).
 
 ## Optional host-run mode (development)
 
@@ -90,12 +93,23 @@ npm run dev
 Frontend checks:
 - production build: `npm run build`
 
+## Realtime endpoint status
+
+| Endpoint | Status | Purpose |
+|---|---|---|
+| `GET /v1/snapshot` | core | canonical realtime snapshot |
+| `GET /v1/ws` | core | canonical realtime websocket updates |
+| `GET /v1/stations` | core | static station reference for map bootstrap |
+| `GET /v1/station-arrivals` | core | station next-arrivals view (live ETA + scheduled fallback) |
+| `GET /v1/station-timetable` | deprecated | compatibility alias for `/v1/station-arrivals` |
+| `GET /v1/line-map` | deprecated | compatibility endpoint during line-map migration |
+
 ## Key folders
 
 - `cmd/ingester` - polls `/autobusi`, publishes raw snapshots
 - `cmd/processor` - writes Bronze/Silver and publishes delay events
 - `cmd/aggregator` - writes Gold route-hour aggregates
-- `cmd/realtime` - serves snapshot + websocket realtime updates
+- `cmd/realtime` - serves realtime snapshot/websocket plus station reference and arrivals query APIs
 - `web/realtime-ui` - React/Vite realtime SPA (served by `cmd/realtime` at `/`)
 - `cmd/staticsync` - one-shot static data sync
 - `deploy/prometheus` - scrape configuration

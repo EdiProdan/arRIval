@@ -18,14 +18,25 @@ function statusLabel(status: string): string {
   return "Connecting";
 }
 
+function formatAgeLabel(valueMs: number | null): string {
+  if (valueMs === null) {
+    return "-";
+  }
+  const rounded = Math.max(0, Math.floor(valueMs / 1000));
+  return `${rounded}s ago`;
+}
+
 export default function App(): JSX.Element {
   const {
     connection,
-    stale,
+    dataStale,
+    connectionStale,
     loadingSnapshot,
     error,
     generatedAt,
-    lastMessageAt,
+    lastDataAt,
+    serverLagMs,
+    reconnectAttempt,
     positions,
     observedDelays,
     predictedDelays,
@@ -35,22 +46,24 @@ export default function App(): JSX.Element {
   return (
     <div className="app-shell">
       <header className="topbar">
+        <div>
+          <h1>arRIval Realtime</h1>
+          <p>Live transit map and stop delay feed</p>
+        </div>
         <div className="topbar-meta">
-          <span className={`status-badge status-${connection}`} data-testid="status-badge">
-            {statusLabel(connection)}
-          </span>
-          <span data-testid="positions-count">{positions.length} positions</span>
-          <span>{observedDelays.length} observed delays</span>
-          <span>{predictedDelays.length} predicted delays</span>
-          <button onClick={() => void refreshSnapshot()} disabled={loadingSnapshot} data-testid="refresh-button">
+          <span className={`status-badge status-${connection}`}>{statusLabel(connection)}</span>
+          <span>Last data: {formatAgeLabel(serverLagMs)}</span>
+          {connectionStale ? <span>Feed heartbeat lagging</span> : null}
+          {reconnectAttempt > 0 ? <span>Reconnect attempt: {reconnectAttempt}</span> : null}
+          <button type="button" onClick={() => void refreshSnapshot()} disabled={loadingSnapshot}>
             {loadingSnapshot ? "Refreshing..." : "Refresh snapshot"}
           </button>
         </div>
       </header>
 
-      {stale ? (
+      {dataStale ? (
         <aside className="stale-banner" data-testid="stale-banner">
-          Data is stale. Last message: {lastMessageAt ? formatZagrebTime(new Date(lastMessageAt).toISOString()) : "-"}
+          Data is stale. Last data timestamp: {lastDataAt ? formatZagrebTime(new Date(lastDataAt).toISOString()) : "-"}
         </aside>
       ) : null}
 
@@ -61,7 +74,7 @@ export default function App(): JSX.Element {
           positions={positions}
           observedDelays={observedDelays}
           predictedDelays={predictedDelays}
-          stale={stale}
+          stale={dataStale}
         />
       </main>
 
@@ -72,3 +85,4 @@ export default function App(): JSX.Element {
     </div>
   );
 }
+

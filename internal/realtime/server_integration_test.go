@@ -58,6 +58,128 @@ func TestServerStationsEndpoint(t *testing.T) {
 	}
 }
 
+func TestServerLineMapEndpoint(t *testing.T) {
+	store := NewStore(StoreConfig{})
+	hub := NewHub(HubConfig{PingInterval: 100 * time.Millisecond})
+
+	tmpDir := t.TempDir()
+	lineMapPath := filepath.Join(tmpDir, "voznired_dnevni.json")
+	payload := []byte(`[
+		{"PolazakId":"1001","BrojLinije":"2A","NazivVarijanteLinije":"A -> B"},
+		{"PolazakId":"1001","BrojLinije":"2A"},
+		{"PolazakId":"1002","BrojLinije":"7","NazivVarijanteLinije":"C -> D"},
+		{"PolazakId":"1003","BrojLinije":""},
+		{"PolazakId":"","BrojLinije":"1"}
+	]`)
+	if err := os.WriteFile(lineMapPath, payload, 0o644); err != nil {
+		t.Fatalf("write line map fixture: %v", err)
+	}
+
+	server := NewServer(ServerConfig{
+		Store:       store,
+		Hub:         hub,
+		LineMapPath: lineMapPath,
+	})
+	defer server.Close()
+
+	httpServer := httptest.NewServer(server.Routes())
+	defer httpServer.Close()
+
+	resp, err := http.Get(httpServer.URL + "/v1/line-map")
+	if err != nil {
+		t.Fatalf("GET /v1/line-map: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if got := resp.Header.Get("Deprecation"); got != "true" {
+		t.Fatalf("Deprecation header = %q, want %q", got, "true")
+	}
+	if got := resp.Header.Get("Sunset"); got != deprecatedSunset {
+		t.Fatalf("Sunset header = %q, want %q", got, deprecatedSunset)
+	}
+
+	type lineMapValue struct {
+		Line      string `json:"line"`
+		RouteName string `json:"route_name,omitempty"`
+	}
+
+	var lineMap map[string]lineMapValue
+	if err := json.NewDecoder(resp.Body).Decode(&lineMap); err != nil {
+		t.Fatalf("decode line map: %v", err)
+	}
+
+	if got := lineMap["1001"].Line; got != "2A" {
+		t.Fatalf("lineMap[1001].line = %q, want %q", got, "2A")
+	}
+	if got := lineMap["1001"].RouteName; got != "A -> B" {
+		t.Fatalf("lineMap[1001].route_name = %q, want %q", got, "A -> B")
+	}
+	if got := lineMap["1002"].Line; got != "7" {
+		t.Fatalf("lineMap[1002].line = %q, want %q", got, "7")
+	}
+	if got := lineMap["1002"].RouteName; got != "C -> D" {
+		t.Fatalf("lineMap[1002].route_name = %q, want %q", got, "C -> D")
+	}
+	if _, exists := lineMap["1003"]; exists {
+		t.Fatalf("lineMap should not contain empty-line entry for key 1003")
+	}
+	if _, exists := lineMap[""]; exists {
+		t.Fatalf("lineMap should not contain empty key")
+	}
+}
+
+func TestServerLineMapEndpointUsesPreloadedCache(t *testing.T) {
+	store := NewStore(StoreConfig{})
+	hub := NewHub(HubConfig{PingInterval: 100 * time.Millisecond})
+
+	tmpDir := t.TempDir()
+	lineMapPath := filepath.Join(tmpDir, "voznired_dnevni.json")
+	payload := []byte(`[{"PolazakId":"1001","BrojLinije":"2A","NazivVarijanteLinije":"A -> B"}]`)
+	if err := os.WriteFile(lineMapPath, payload, 0o644); err != nil {
+		t.Fatalf("write line map fixture: %v", err)
+	}
+
+	server := NewServer(ServerConfig{
+		Store:       store,
+		Hub:         hub,
+		LineMapPath: lineMapPath,
+	})
+	defer server.Close()
+
+	if err := os.Remove(lineMapPath); err != nil {
+		t.Fatalf("remove line map fixture: %v", err)
+	}
+
+	httpServer := httptest.NewServer(server.Routes())
+	defer httpServer.Close()
+
+	resp, err := http.Get(httpServer.URL + "/v1/line-map")
+	if err != nil {
+		t.Fatalf("GET /v1/line-map: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	type lineMapValue struct {
+		Line      string `json:"line"`
+		RouteName string `json:"route_name,omitempty"`
+	}
+
+	var lineMap map[string]lineMapValue
+	if err := json.NewDecoder(resp.Body).Decode(&lineMap); err != nil {
+		t.Fatalf("decode line map: %v", err)
+	}
+	if got := lineMap["1001"].Line; got != "2A" {
+		t.Fatalf("lineMap[1001].line = %q, want %q", got, "2A")
+	}
+}
+
 func TestServerHealthAndReadyz(t *testing.T) {
 	store := NewStore(StoreConfig{})
 	hub := NewHub(HubConfig{PingInterval: 100 * time.Millisecond})
@@ -87,7 +209,12 @@ func TestServerHealthAndReadyz(t *testing.T) {
 func TestServerSnapshotEmptyAndPopulated(t *testing.T) {
 	store := NewStore(StoreConfig{})
 	hub := NewHub(HubConfig{PingInterval: 100 * time.Millisecond})
-	server := NewServer(ServerConfig{Store: store, Hub: hub})
+	server := NewServer(ServerConfig{
+		Store:             store,
+		Hub:               hub,
+		SourceInterval:    5 * time.Second,
+		HeartbeatInterval: 20 * time.Second,
+	})
 	defer server.Close()
 
 	httpServer := httptest.NewServer(server.Routes())
@@ -101,6 +228,12 @@ func TestServerSnapshotEmptyAndPopulated(t *testing.T) {
 			initial.Meta.ObservedDelaysCount,
 			initial.Meta.PredictedDelaysCount,
 		)
+	}
+	if initial.Meta.SourceIntervalMS != 5000 {
+		t.Fatalf("initial SourceIntervalMS = %d, want 5000", initial.Meta.SourceIntervalMS)
+	}
+	if initial.Meta.HeartbeatIntervalMS != 20000 {
+		t.Fatalf("initial HeartbeatIntervalMS = %d, want 20000", initial.Meta.HeartbeatIntervalMS)
 	}
 
 	observedAt := time.Date(2026, 2, 18, 11, 0, 0, 0, time.UTC)
@@ -122,6 +255,12 @@ func TestServerSnapshotEmptyAndPopulated(t *testing.T) {
 			snapshot.Meta.ObservedDelaysCount,
 			snapshot.Meta.PredictedDelaysCount,
 		)
+	}
+	if snapshot.Meta.SourceIntervalMS != 5000 {
+		t.Fatalf("snapshot SourceIntervalMS = %d, want 5000", snapshot.Meta.SourceIntervalMS)
+	}
+	if snapshot.Meta.HeartbeatIntervalMS != 20000 {
+		t.Fatalf("snapshot HeartbeatIntervalMS = %d, want 20000", snapshot.Meta.HeartbeatIntervalMS)
 	}
 }
 
