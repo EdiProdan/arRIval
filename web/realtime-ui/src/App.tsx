@@ -14,44 +14,18 @@ export default function App(): JSX.Element {
   const {
     connection,
     dataStale,
-    connectionStale,
-    loadingSnapshot,
     error,
     generatedAt,
     lastDataAt,
-    serverLagMs,
-    reconnectAttempt,
     positions,
     observedDelays,
-    predictedDelays,
-    refreshSnapshot
+    predictedDelays
   } = useRealtimeFeed();
   const isConnectionLive = connection === "live";
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <h1>arRIval Realtime</h1>
-          <p>Live transit map and stop delay feed</p>
-        </div>
-        <div className="topbar-meta">
-          <span className="connection-indicator" aria-live="polite">
-            {isConnectionLive ? (
-              <span className="connection-indicator__dot" aria-label="live" title="live" />
-            ) : (
-              <span className={`connection-indicator__state connection-indicator__state--${connection}`}>{connection}</span>
-            )}
-          </span>
-          <span>Last data: {formatAgeLabel(serverLagMs)}</span>
-          {connectionStale ? <span>Feed heartbeat lagging</span> : null}
-          {reconnectAttempt > 0 ? <span>Reconnect attempt: {reconnectAttempt}</span> : null}
-          <button type="button" onClick={() => void refreshSnapshot()} disabled={loadingSnapshot}>
-            {loadingSnapshot ? "Refreshing..." : "Refresh snapshot"}
-          </button>
-        </div>
-      </header>
-
+      
       {dataStale ? (
         <aside className="stale-banner" data-testid="stale-banner">
           Data is stale. Last data timestamp: {lastDataAt ? formatZagrebTime(new Date(lastDataAt).toISOString()) : "-"}

@@ -723,7 +723,7 @@ export function MapPanel({ positions, observedDelays, predictedDelays, stale }: 
   return (
     <section className={`panel map-panel${stale ? " panel--stale" : ""}`}>
       <header className="panel-header">
-        <h2>Live Map</h2>
+        <h2>arRIval</h2>
         <p>{positions.length} active positions, {stations.length} stations</p>
       </header>
       <div className="map-frame" ref={mapElementRef} data-testid="map-frame" />
