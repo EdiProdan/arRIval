@@ -1,8 +1,7 @@
 # Reference: Delay Contract
 
-This page defines the active delay contracts used by runtime services.
+This page defines the active delay contracts used by runtime services: 
 
-Status on **February 22, 2026**:
 - `processor` emits observed and predicted delay events.
 - `aggregator` consumes observed delay events.
 - `realtime` consumes observed and predicted delay events.
@@ -62,7 +61,16 @@ Go type: `internal/contracts/delay.go` (`PredictedDelay`)
 
 ## Realtime API payload contract
 
-Realtime keeps `/v1/snapshot` and `/v1/ws` paths.
+Realtime endpoint status:
+
+| Endpoint | Status | Purpose |
+|---|---|---|
+| `GET /v1/snapshot` | core | canonical realtime snapshot |
+| `GET /v1/ws` | core | canonical realtime websocket updates |
+| `GET /v1/stations` | core | static station reference |
+| `GET /v1/station-arrivals` | core | station next-arrivals query |
+| `GET /v1/station-timetable` | deprecated | compatibility alias for `/v1/station-arrivals` |
+| `GET /v1/line-map` | deprecated | compatibility endpoint during migration |
 
 ### Snapshot (`/v1/snapshot`)
 
@@ -76,10 +84,13 @@ Top-level fields:
 - `meta.positions_count`
 - `meta.observed_delays_count`
 - `meta.predicted_delays_count`
+- `meta.source_interval_ms`
+- `meta.heartbeat_interval_ms`
 
 State precedence:
 - observed delay is authoritative for progressed stops
 - when observed delay is upserted, predicted entries for the same `trip_id` and `station_seq <= observed.station_seq` are removed
+- delay-state identity is keyed by `(trip_id, station_id, station_seq)` to preserve loop/revisit stops
 
 ### Websocket (`/v1/ws`)
 

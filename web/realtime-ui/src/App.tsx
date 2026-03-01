@@ -1,70 +1,46 @@
-import { DelayBoard } from "./components/DelayBoard";
 import { MapPanel } from "./components/MapPanel";
 import { useRealtimeFeed } from "./hooks/useRealtimeFeed";
 import { formatZagrebTime } from "./utils/time";
 
-function statusLabel(status: string): string {
-  if (status === "live") {
-    return "Live";
+function formatAgeLabel(valueMs: number | null): string {
+  if (valueMs === null) {
+    return "-";
   }
-  if (status === "reconnecting") {
-    return "Reconnecting";
-  }
-  if (status === "stale") {
-    return "Stale";
-  }
-  if (status === "offline") {
-    return "Offline";
-  }
-  return "Connecting";
+  const rounded = Math.max(0, Math.floor(valueMs / 1000));
+  return `${rounded}s ago`;
 }
 
 export default function App(): JSX.Element {
   const {
     connection,
-    stale,
-    loadingSnapshot,
+    dataStale,
     error,
     generatedAt,
-    lastMessageAt,
+    lastDataAt,
     positions,
     observedDelays,
-    predictedDelays,
-    refreshSnapshot
+    predictedDelays
   } = useRealtimeFeed();
+  const isConnectionLive = connection === "live";
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <h1>arRIval Realtime</h1>
-          <p>Public read-only operations view</p>
-        </div>
-
-        <div className="topbar-meta">
-          <span className={`status-badge status-${connection}`} data-testid="status-badge">
-            {statusLabel(connection)}
-          </span>
-          <span data-testid="positions-count">{positions.length} positions</span>
-          <span>{observedDelays.length} observed delays</span>
-          <span>{predictedDelays.length} predicted delays</span>
-          <button onClick={() => void refreshSnapshot()} disabled={loadingSnapshot} data-testid="refresh-button">
-            {loadingSnapshot ? "Refreshing..." : "Refresh snapshot"}
-          </button>
-        </div>
-      </header>
-
-      {stale ? (
+      
+      {dataStale ? (
         <aside className="stale-banner" data-testid="stale-banner">
-          Data is stale. Last message: {lastMessageAt ? formatZagrebTime(new Date(lastMessageAt).toISOString()) : "-"}
+          Data is stale. Last data timestamp: {lastDataAt ? formatZagrebTime(new Date(lastDataAt).toISOString()) : "-"}
         </aside>
       ) : null}
 
       {error ? <aside className="error-banner">Snapshot error: {error}</aside> : null}
 
-      <main className="layout-grid">
-        <MapPanel positions={positions} stale={stale} />
-        <DelayBoard observedDelays={observedDelays} predictedDelays={predictedDelays} stale={stale} />
+      <main className="layout-grid layout-grid--single">
+        <MapPanel
+          positions={positions}
+          observedDelays={observedDelays}
+          predictedDelays={predictedDelays}
+          stale={dataStale}
+        />
       </main>
 
       <footer className="footer-meta">

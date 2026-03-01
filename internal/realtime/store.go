@@ -93,7 +93,7 @@ func (s *Store) UpsertObservedDelay(event contracts.ObservedDelay) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := delayKey(event.TripID, event.StationID)
+	key := delayKey(event.TripID, event.StationID, event.StationSeq)
 	s.observed[key] = observedDelayEntry{
 		value:     event,
 		updatedAt: s.now().UTC(),
@@ -110,7 +110,7 @@ func (s *Store) UpsertPredictedDelay(event contracts.PredictedDelay) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := delayKey(event.TripID, event.StationID)
+	key := delayKey(event.TripID, event.StationID, event.StationSeq)
 	s.predicted[key] = predictedDelayEntry{
 		value:     event,
 		updatedAt: s.now().UTC(),
@@ -224,6 +224,6 @@ func positionKey(voznjaBusID, gbr *int64) string {
 	return "unknown"
 }
 
-func delayKey(tripID string, stationID int64) string {
-	return fmt.Sprintf("%s:%d", tripID, stationID)
+func delayKey(tripID string, stationID, stationSeq int64) string {
+	return fmt.Sprintf("%s:%d:%d", tripID, stationID, stationSeq)
 }

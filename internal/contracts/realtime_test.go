@@ -52,6 +52,8 @@ func TestRealtimeSnapshotJSONShape(t *testing.T) {
 			PositionsCount:       1,
 			ObservedDelaysCount:  1,
 			PredictedDelaysCount: 1,
+			SourceIntervalMS:     5000,
+			HeartbeatIntervalMS:  20000,
 		},
 	}
 
@@ -84,6 +86,12 @@ func TestRealtimeSnapshotJSONShape(t *testing.T) {
 	}
 	if _, ok := metaRaw["predicted_delays_count"]; !ok {
 		t.Fatalf("snapshot meta missing predicted_delays_count")
+	}
+	if _, ok := metaRaw["source_interval_ms"]; !ok {
+		t.Fatalf("snapshot meta missing source_interval_ms")
+	}
+	if _, ok := metaRaw["heartbeat_interval_ms"]; !ok {
+		t.Fatalf("snapshot meta missing heartbeat_interval_ms")
 	}
 }
 

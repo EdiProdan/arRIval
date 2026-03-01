@@ -38,7 +38,18 @@ API Poller -> Redpanda -> Processor -> Parquet (Bronze/Silver)
 
 4. `cmd/realtime`
 - consumes `bus-positions-raw`, `bus-delay-observed`, `bus-delay-predicted`
-- serves `GET /v1/snapshot` and `GET /v1/ws`
+- serves realtime snapshot/websocket plus station-read-model HTTP endpoints
+
+Realtime endpoint status:
+
+| Endpoint | Status | Purpose |
+|---|---|---|
+| `GET /v1/snapshot` | core | canonical realtime snapshot |
+| `GET /v1/ws` | core | canonical realtime updates |
+| `GET /v1/stations` | core | static station reference |
+| `GET /v1/station-arrivals` | core | station next-arrivals query (live ETA + scheduled fallback) |
+| `GET /v1/station-timetable` | deprecated | compatibility alias |
+| `GET /v1/line-map` | deprecated | compatibility endpoint |
 
 ### Operational notes
 - static data is downloaded by `cmd/staticsync` into `data/*.json`

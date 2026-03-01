@@ -27,6 +27,8 @@ type RealtimeSnapshotMeta struct {
 	PositionsCount       int `json:"positions_count"`
 	ObservedDelaysCount  int `json:"observed_delays_count"`
 	PredictedDelaysCount int `json:"predicted_delays_count"`
+	SourceIntervalMS     int `json:"source_interval_ms"`
+	HeartbeatIntervalMS  int `json:"heartbeat_interval_ms"`
 }
 
 type RealtimeEnvelope struct {

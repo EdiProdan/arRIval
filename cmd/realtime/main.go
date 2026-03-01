@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -25,10 +26,12 @@ const (
 	defaultConsumerGroup        = "arrival-realtime"
 	defaultHTTPAddr             = ":8080"
 	defaultMetricsAddr          = ":9104"
+	defaultStaticDir            = "data"
 
-	defaultPositionsTTL = 5 * time.Minute
-	defaultDelaysTTL    = 90 * time.Minute
-	defaultPingInterval = 20 * time.Second
+	defaultPositionsTTL   = 5 * time.Minute
+	defaultDelaysTTL      = 90 * time.Minute
+	defaultPingInterval   = 20 * time.Second
+	defaultSourceInterval = 30 * time.Second
 
 	httpShutdownTimeout = 5 * time.Second
 )
@@ -62,6 +65,7 @@ func main() {
 	consumerGroup := envutil.StringEnv("ARRIVAL_REALTIME_GROUP", defaultConsumerGroup)
 	httpAddr := envutil.StringEnv("ARRIVAL_REALTIME_HTTP_ADDR", defaultHTTPAddr)
 	metricsAddr := envutil.StringEnv("ARRIVAL_REALTIME_METRICS_ADDR", defaultMetricsAddr)
+	staticDir := envutil.StringEnv("ARRIVAL_STATIC_DIR", defaultStaticDir)
 	wsClientBuffer := envutil.IntEnv("ARRIVAL_REALTIME_WS_CLIENT_BUFFER", 128)
 
 	positionsTTL, invalidPositionsTTL := envutil.DurationEnv("ARRIVAL_REALTIME_POSITIONS_TTL", defaultPositionsTTL)
@@ -75,6 +79,10 @@ func main() {
 	pingInterval, invalidPingInterval := envutil.DurationEnv("ARRIVAL_REALTIME_WS_PING_INTERVAL", defaultPingInterval)
 	if invalidPingInterval {
 		log.Printf("invalid duration for ARRIVAL_REALTIME_WS_PING_INTERVAL=%q, using fallback %s", os.Getenv("ARRIVAL_REALTIME_WS_PING_INTERVAL"), defaultPingInterval)
+	}
+	sourceInterval, invalidSourceInterval := envutil.DurationEnv("ARRIVAL_INGESTER_POLL_INTERVAL", defaultSourceInterval)
+	if invalidSourceInterval {
+		log.Printf("invalid duration for ARRIVAL_INGESTER_POLL_INTERVAL=%q, using fallback %s", os.Getenv("ARRIVAL_INGESTER_POLL_INTERVAL"), defaultSourceInterval)
 	}
 
 	collector := newRealtimeMetrics()
@@ -107,8 +115,13 @@ func main() {
 	})
 
 	server := realtime.NewServer(realtime.ServerConfig{
-		Store: store,
-		Hub:   hub,
+		Store:             store,
+		Hub:               hub,
+		StationsPath:      filepath.Join(staticDir, "stanice.json"),
+		LineMapPath:       filepath.Join(staticDir, "voznired_dnevni.json"),
+		TimetablePath:     filepath.Join(staticDir, "voznired_dnevni.json"),
+		SourceInterval:    sourceInterval,
+		HeartbeatInterval: pingInterval,
 		Callbacks: realtime.ServerCallbacks{
 			OnKafkaRecord: func(topic string) {
 				collector.kafkaRecordsTotal.WithLabelValues(topic).Inc()
@@ -152,7 +165,7 @@ func main() {
 
 	server.SetReady(true)
 	log.Printf(
-		"realtime started: group=%s positions_topic=%s observed_delays_topic=%s predicted_delays_topic=%s positions_ttl=%s delays_ttl=%s ping_interval=%s",
+		"realtime started: group=%s positions_topic=%s observed_delays_topic=%s predicted_delays_topic=%s positions_ttl=%s delays_ttl=%s ping_interval=%s source_interval=%s",
 		consumerGroup,
 		positionsTopic,
 		observedDelaysTopic,
@@ -160,6 +173,7 @@ func main() {
 		positionsTTL,
 		delaysTTL,
 		pingInterval,
+		sourceInterval,
 	)
 
 	var consumed int64
