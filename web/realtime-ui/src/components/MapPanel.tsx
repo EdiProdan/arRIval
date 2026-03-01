@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 
 import { formatZagrebClock } from "../utils/time";
-import type { ObservedDelay, PredictedDelay, RealtimePosition, StationTimetableResponse } from "../types";
+import type { ObservedDelay, PredictedDelay, RealtimePosition, StationTimetableResponse, StationTimetableRow } from "../types";
 
 const RIJEKA_CENTER: L.LatLngTuple = [45.3271, 14.4422];
 const STATION_TIMETABLE_WINDOW_MINUTES = 60;
@@ -146,7 +146,29 @@ function stationPopupErrorNode(message: string): HTMLElement {
   return error;
 }
 
-function stationPopupTableNode(payload: StationTimetableResponse): HTMLElement {
+function sortStationRows(rows: StationTimetableRow[]): StationTimetableRow[] {
+  return [...rows].sort((left, right) => {
+    const byEta = parseTimestamp(left.eta_time) - parseTimestamp(right.eta_time);
+    if (byEta !== 0) {
+      return byEta;
+    }
+    const byScheduled = parseTimestamp(left.scheduled_time) - parseTimestamp(right.scheduled_time);
+    if (byScheduled !== 0) {
+      return byScheduled;
+    }
+    return left.line.localeCompare(right.line, undefined, { numeric: true, sensitivity: "base" });
+  });
+}
+
+function formatStationDelay(delaySeconds: number | null, status: "live" | "scheduled"): string {
+  if (typeof delaySeconds !== "number" || Number.isNaN(delaySeconds) || Math.abs(delaySeconds) < 30) {
+    return status === "live" ? "on time" : "-";
+  }
+  const minutes = Math.max(1, Math.round(Math.abs(delaySeconds) / 60));
+  return delaySeconds > 0 ? `+${minutes}m` : `-${minutes}m`;
+}
+
+function stationPopupListNode(payload: StationTimetableResponse): HTMLElement {
   if (!Array.isArray(payload.rows) || payload.rows.length === 0) {
     const empty = document.createElement("p");
     empty.className = "station-popup__empty";
@@ -154,58 +176,59 @@ function stationPopupTableNode(payload: StationTimetableResponse): HTMLElement {
     return empty;
   }
 
-  const wrap = document.createElement("div");
-  wrap.className = "station-popup__table-wrap";
+  const list = document.createElement("div");
+  list.className = "station-popup__list";
 
-  const table = document.createElement("table");
-  table.className = "station-popup__table";
+  for (const row of sortStationRows(payload.rows)) {
+    const isLive = row.status === "live";
+    const item = document.createElement("div");
+    item.className = `station-popup__item ${isLive ? "station-popup__item--live" : "station-popup__item--scheduled"}`;
 
-  const head = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  for (const label of ["Status", "Line", "Scheduled", "ETA", "Delay (s)"]) {
-    const cell = document.createElement("th");
-    cell.textContent = label;
-    headRow.appendChild(cell);
-  }
-  head.appendChild(headRow);
-  table.appendChild(head);
+    const linePill = document.createElement("span");
+    linePill.className = "station-popup__line-pill";
+    linePill.textContent = normalizeLineLabel(row.line) ?? "-";
+    item.appendChild(linePill);
 
-  const body = document.createElement("tbody");
-  for (const row of payload.rows) {
-    const tableRow = document.createElement("tr");
+    const eta = document.createElement("div");
+    eta.className = `station-popup__eta${isLive ? "" : " station-popup__eta--scheduled"}`;
 
-    const statusCell = document.createElement("td");
-    statusCell.textContent = row.status;
-    statusCell.className = row.status === "live" ? "station-popup__status--live" : "station-popup__status--scheduled";
-    tableRow.appendChild(statusCell);
-
-    const lineCell = document.createElement("td");
-    lineCell.textContent = row.line || "-";
-    tableRow.appendChild(lineCell);
-
-    const scheduledCell = document.createElement("td");
-    scheduledCell.textContent = formatZagrebClock(row.scheduled_time);
-    tableRow.appendChild(scheduledCell);
-
-    const etaCell = document.createElement("td");
-    etaCell.textContent = formatZagrebClock(row.eta_time);
-    tableRow.appendChild(etaCell);
-
-    const delayCell = document.createElement("td");
-    if (typeof row.delay_seconds === "number") {
-      delayCell.textContent = String(row.delay_seconds);
-      delayCell.className = row.delay_seconds > 0 ? "delay-positive" : "delay-early";
-    } else {
-      delayCell.textContent = "-";
+    const etaMain = document.createElement("div");
+    etaMain.className = "station-popup__eta-main";
+    if (isLive) {
+      const dot = document.createElement("span");
+      dot.className = "station-popup__live-dot";
+      dot.setAttribute("aria-label", "live");
+      etaMain.appendChild(dot);
     }
-    tableRow.appendChild(delayCell);
 
-    body.appendChild(tableRow);
+    const etaValue = document.createElement("span");
+    etaValue.textContent = formatZagrebClock(row.eta_time);
+    etaMain.appendChild(etaValue);
+    eta.appendChild(etaMain);
+
+    item.appendChild(eta);
+
+    const delayText = formatStationDelay(row.delay_seconds, row.status);
+    const delay = document.createElement("span");
+    delay.className = "station-popup__delay";
+    if (delayText === "on time") {
+      delay.className += " station-popup__delay--ontime";
+    } else if (delayText === "-") {
+      delay.className += " station-popup__delay--muted";
+    } else if (delayText.startsWith("+")) {
+      delay.className += " station-popup__delay--late";
+    } else if (delayText.startsWith("-")) {
+      delay.className += " station-popup__delay--early";
+    } else {
+      delay.className += " station-popup__delay--muted";
+    }
+    delay.textContent = delayText;
+    item.appendChild(delay);
+
+    list.appendChild(item);
   }
 
-  table.appendChild(body);
-  wrap.appendChild(table);
-  return wrap;
+  return list;
 }
 
 function collectBusTimelines(observedDelays: ObservedDelay[], predictedDelays: PredictedDelay[]): Map<number, BusTimeline> {
@@ -322,16 +345,14 @@ function busTooltip(timeline?: BusTimeline): HTMLElement {
     const row = timeline.rows[i];
     const isVisited = row.phase === "Visited";
     const isLast = i === timeline.rows.length - 1;
-    const isBusBoundary = i === lastVisitedIdx;
-
     const isFirst = i === 0;
-    const isFirstFuture = lastVisitedIdx >= 0 && i === lastVisitedIdx + 1;
+    const isTransition = i === lastVisitedIdx && lastVisitedIdx < timeline.rows.length - 1;
 
     const stop = document.createElement("div");
     let cls = `bus-timeline__stop ${isVisited ? "bus-timeline__stop--visited" : "bus-timeline__stop--future"}`;
     if (isFirst) cls += " bus-timeline__stop--first";
     if (isLast) cls += " bus-timeline__stop--last";
-    if (isBusBoundary && !isLast) cls += " bus-timeline__stop--boundary";
+    if (isTransition) cls += " bus-timeline__stop--transition";
     stop.className = cls;
 
     // Dot
@@ -464,7 +485,7 @@ export function MapPanel({ positions, observedDelays, predictedDelays, stale }: 
     const cached = cache.get(stationID);
 
     if (cached && cached.data && now-cached.fetchedAt < STATION_TIMETABLE_CACHE_TTL_MS) {
-      replaceChildren(container, stationPopupTableNode(cached.data));
+      replaceChildren(container, stationPopupListNode(cached.data));
       return;
     }
     if (cached && cached.error && now-cached.fetchedAt < STATION_TIMETABLE_CACHE_TTL_MS) {
@@ -488,7 +509,7 @@ export function MapPanel({ positions, observedDelays, predictedDelays, stale }: 
         fetchedAt: Date.now(),
         data: payload
       });
-      replaceChildren(container, stationPopupTableNode(payload));
+      replaceChildren(container, stationPopupListNode(payload));
     } catch {
       cache.set(stationID, {
         fetchedAt: Date.now(),
@@ -684,7 +705,7 @@ export function MapPanel({ positions, observedDelays, predictedDelays, stale }: 
 
       marker.bindPopup(popupRoot, {
         className: "station-popup-layer",
-        maxWidth: 520
+        maxWidth: 360
       });
 
       marker.on("popupopen", () => {

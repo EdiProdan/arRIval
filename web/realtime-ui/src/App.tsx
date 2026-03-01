@@ -2,22 +2,6 @@ import { MapPanel } from "./components/MapPanel";
 import { useRealtimeFeed } from "./hooks/useRealtimeFeed";
 import { formatZagrebTime } from "./utils/time";
 
-function statusLabel(status: string): string {
-  if (status === "live") {
-    return "Live";
-  }
-  if (status === "reconnecting") {
-    return "Reconnecting";
-  }
-  if (status === "stale") {
-    return "Stale";
-  }
-  if (status === "offline") {
-    return "Offline";
-  }
-  return "Connecting";
-}
-
 function formatAgeLabel(valueMs: number | null): string {
   if (valueMs === null) {
     return "-";
@@ -42,6 +26,7 @@ export default function App(): JSX.Element {
     predictedDelays,
     refreshSnapshot
   } = useRealtimeFeed();
+  const isConnectionLive = connection === "live";
 
   return (
     <div className="app-shell">
@@ -51,7 +36,13 @@ export default function App(): JSX.Element {
           <p>Live transit map and stop delay feed</p>
         </div>
         <div className="topbar-meta">
-          <span className={`status-badge status-${connection}`}>{statusLabel(connection)}</span>
+          <span className="connection-indicator" aria-live="polite">
+            {isConnectionLive ? (
+              <span className="connection-indicator__dot" aria-label="live" title="live" />
+            ) : (
+              <span className={`connection-indicator__state connection-indicator__state--${connection}`}>{connection}</span>
+            )}
+          </span>
           <span>Last data: {formatAgeLabel(serverLagMs)}</span>
           {connectionStale ? <span>Feed heartbeat lagging</span> : null}
           {reconnectAttempt > 0 ? <span>Reconnect attempt: {reconnectAttempt}</span> : null}
@@ -85,4 +76,3 @@ export default function App(): JSX.Element {
     </div>
   );
 }
-
